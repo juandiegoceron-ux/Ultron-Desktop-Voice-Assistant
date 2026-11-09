@@ -153,7 +153,59 @@ class TestUltronAssistant(unittest.TestCase):
         with patch("ultron.skills.wb.open") as mock_wb:
             resp = self.assistant.process_command("Quiero enviar un correo, me puedes ayudar.")
             self.assertIn("Gmail", resp)
-            mock_wb.assert_called_once_with("https://mail.google.com/mail/u/0/#inbox?compose=new")
+            mock_wb.assert_called_once_with("https://mail.google.com/mail/?view=cm&fs=1")
+
+    def test_compose_email_multi_turn_and_prefill(self) -> None:
+        with patch("ultron.skills.wb.open") as mock_wb, patch.object(
+            self.assistant.skills.dictation, "set_clipboard_text"
+        ) as mock_clip:
+            # Turno 1: Apertura inicial solicitando redacción
+            resp1 = self.assistant.process_command("Redacta un correo un gmail para mí.")
+            self.assertIn("Gmail", resp1)
+            mock_wb.assert_called_with("https://mail.google.com/mail/?view=cm&fs=1")
+
+            # Turno 2: Especificación de destinatario y cuerpo
+            resp2 = self.assistant.process_command(
+                "¿Va dirigido a Sebastián Giraldo y el mensaje debe decir, hola Sebastián, cómo estás? Estoy pendiente al trabajo que tenemos que desarrollar."
+            )
+            self.assertIn("Sebastián Giraldo", resp2)
+            self.assertIn("portapapeles", resp2.lower())
+            mock_clip.assert_called_with(
+                "hola Sebastián, cómo estás? Estoy pendiente al trabajo que tenemos que desarrollar"
+            )
+            last_url = mock_wb.call_args[0][0]
+            self.assertIn("view=cm", last_url)
+            self.assertIn("to=Sebasti%C3%A1n+Giraldo", last_url)
+            self.assertIn("hola+Sebasti%C3%A1n", last_url)
+
+            # Turno 3: Aclaración del usuario ("necesito que abras gmail y escribas el mensaje")
+            resp3 = self.assistant.process_command(
+                "No, no has enviado nada, necesito que abras gmail y escribas el mensaje."
+            )
+            self.assertIn("Sebastián Giraldo", resp3)
+            self.assertIn("portapapeles", resp3.lower())
+
+    def test_compose_email_single_shot_recipient_subject_body(self) -> None:
+        with patch("ultron.skills.wb.open") as mock_wb, patch.object(
+            self.assistant.skills.dictation, "set_clipboard_text"
+        ) as mock_clip:
+            resp = self.assistant.process_command(
+                "Redacta un correo a María Pérez con el asunto Presupuesto y el mensaje Hola María, adjunto los costos."
+            )
+            self.assertIn("María Pérez", resp)
+            mock_clip.assert_called_with("Hola María, adjunto los costos")
+            last_url = mock_wb.call_args[0][0]
+            self.assertIn("to=Mar%C3%ADa+P%C3%A9rez", last_url)
+            self.assertIn("su=Presupuesto", last_url)
+            self.assertIn("body=Hola+Mar%C3%ADa%2C+adjunto+los+costos", last_url)
+
+    def test_llm_anti_hallucination_guardrails_present(self) -> None:
+        from ultron.llm import build_system_prompt
+
+        prompt = build_system_prompt(self.assistant.config, response_lang="es", input_lang="es")
+        self.assertIn("REGLAS CRÍTICAS DE VERACIDAD Y ACCIÓN", prompt)
+        self.assertIn("JAMÁS digas que enviaste un correo", prompt)
+        self.assertIn("NUNCA pretendas haber pulsado 'Enviar'", prompt)
 
     def test_pid_controller_instant_explanation(self) -> None:
         resp = self.assistant.process_command("qué sabes del pid")

@@ -45,6 +45,56 @@ class UltronAssistant:
         )
         self.skills = UltronSkills(self.config, self.tts)
         self.brain = UltronBrain(self.config)
+        self._last_skill_context: str = ""
+
+    def _is_email_intent(self, query: str) -> bool:
+        """Determina si la orden del usuario solicita abrir Gmail, redactar, dictar o preparar un correo electrónico."""
+        # 1. Nombres clave de correo
+        email_nouns = ("correo", "email", "mail", "gmail")
+        has_email_noun = any(n in query for n in email_nouns)
+
+        # 2. Verbos de acción (imperativos, infinitivos, subjuntivos y en inglés)
+        action_verbs = (
+            "redacta", "redactar", "redáctame", "redactame",
+            "escribe", "escribir", "escríbeme", "escribeme", "escribas", "escriba",
+            "envía", "envia", "enviar", "envíame", "enviame", "envíes", "envies",
+            "manda", "mandar", "mándame", "mandame", "mandes",
+            "abre", "abrir", "ábreme", "abreme", "abras", "abres",
+            "nuevo", "nueva", "crea", "crear", "prepara", "preparar",
+            "compose", "write", "send", "open", "draft",
+        )
+        has_action_verb = any(v in query for v in action_verbs)
+
+        if has_email_noun and has_action_verb:
+            return True
+
+        # 3. Frases completas directas
+        if any(
+            p in query
+            for p in (
+                "enviar un correo", "enviar correo", "mandar un correo", "mandar correo",
+                "redactar un correo", "redactar correo", "redacta un correo", "redacta correo",
+                "escribir un correo", "escribir correo", "escribe un correo", "escribe correo",
+                "envía un correo", "envia un correo", "manda un correo",
+                "send email", "write email", "compose email", "open gmail",
+                "abrir gmail", "abre gmail", "abrir el correo", "abre el correo",
+                "abrir mi correo", "abre mi correo", "redacta un gmail", "redacta en gmail",
+            )
+        ):
+            return True
+
+        # 4. Estructura de destinatario y contenido ("va dirigido a ... y el mensaje debe decir ...")
+        if re.search(r"\b(?:va\s+dirigido\s+a|dirigido\s+a)\b", query) and re.search(
+            r"\b(?:mensaje|cuerpo|asunto|debe\s+decir|que\s+diga)\b", query
+        ):
+            return True
+
+        # 5. Si el contexto inmediato previo fue redacción de correo
+        if getattr(self, "_last_skill_context", "") == "compose_email":
+            if any(w in query for w in ("dirigido a", "para ", "el mensaje", "asunto", "que diga", "destinatario")):
+                return True
+
+        return False
 
     def reply_lang(self, detected_lang: str) -> str:
         """
@@ -331,42 +381,9 @@ class UltronAssistant:
             self.tts.speak(msg, lang=out_lang)
             return msg
 
-        # 7.8 Envío y Redacción de Correo Electrónico ("quiero enviar un correo", "redactar correo", etc.)
-        if (
-            any(
-                w in query
-                for w in (
-                    "enviar un correo",
-                    "enviar correo",
-                    "mandar un correo",
-                    "mandar correo",
-                    "redactar un correo",
-                    "redactar correo",
-                    "escribir un correo",
-                    "send email",
-                    "write email",
-                    "compose email",
-                )
-            )
-            or (
-                "correo" in query
-                and any(
-                    v in query
-                    for v in (
-                        "enviar",
-                        "mandar",
-                        "redactar",
-                        "escribir",
-                        "nuevo",
-                        "ayuda",
-                        "ayudar",
-                        "abrir",
-                        "abre",
-                        "quiero",
-                    )
-                )
-            )
-        ):
+        # 7.8 Envío y Redacción de Correo Electrónico ("redacta un correo en gmail", "escribe un correo a...", etc.)
+        if self._is_email_intent(query):
+            self._last_skill_context = "compose_email"
             return self.skills.compose_email(query=stripped, lang=out_lang)
 
         # 7.9 Explicación Instantánea Local de Control PID (Biomédica / Automatización)

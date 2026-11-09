@@ -107,6 +107,7 @@ class UltronSkills:
         self.vision = UltronVision(config=self.config)
         self.dictation = SmartDictationEngine(config=self.config)
         self.file_organizer = FileOrganizerEngine(user_name=self.config.user_name)
+        self._pending_email: Dict[str, str] = {"to": "", "su": "", "body": ""}
 
     def greet(self, lang: str = "es") -> str:
         """Saluda a Juan Diego según la hora del día."""
@@ -713,13 +714,125 @@ class UltronSkills:
     # ──────────────────────────────────────────────────────────────────────
 
     def compose_email(self, query: str = "", lang: str = "es") -> str:
-        """Abre Gmail para redactar un correo y asiste con dictado por voz."""
-        gmail_compose_url = "https://mail.google.com/mail/u/0/#inbox?compose=new"
-        wb.open(gmail_compose_url)
-        msg = (
-            f"Abriendo Gmail para redactar tu correo, {self.config.user_name}. "
-            "Puedes dictarme el contenido diciendo 'Ultrón, dicta...' y lo tendrás en tu portapapeles listo para pegar con Ctrl+V."
+        """
+        Abre la ventana de redacción en Gmail con campos precargados (destinatario, asunto, cuerpo)
+        y copia el mensaje automáticamente al portapapeles para envío y pegado inmediato.
+        """
+        clean = (query or "").strip("¿?¡!., \t\n\r")
+
+        # 1. Si es una orden simple como "abre gmail" o "abrir gmail" sin contenido ni redacción
+        if clean.lower() in ("abre gmail", "abrir gmail", "open gmail", "abre el gmail", "abre mi gmail"):
+            wb.open("https://mail.google.com")
+            msg = f"Abriendo Gmail, {self.config.user_name}."
+            self.tts.speak(msg, lang=lang)
+            return msg
+
+        # 2. Extraer campos: asunto, cuerpo y destinatario
+        recipient = ""
+        subject = ""
+        body = ""
+
+        # A. Extracción de Asunto ("con el asunto ...", "asunto: ...")
+        subj_match = re.search(
+            r"(?:con\s+el\s+asunto|con\s+asunto|asunto\s*:?|subject\s*:?)\s+([^,]+?)(?=\s+(?:y\s+el\s+mensaje|el\s+mensaje|con\s+el\s+mensaje|mensaje\s*:|que\s+diga|y\s+el\s+cuerpo|$))",
+            clean,
+            re.IGNORECASE,
         )
+        if subj_match:
+            subject = subj_match.group(1).strip("¿?¡!., ")
+
+        # B. Extracción de Cuerpo del Mensaje ("el mensaje debe decir ...", "que diga ...", etc.)
+        body_match = re.search(
+            r"(?:y\s+el\s+mensaje\s+(?:debe\s+decir|es)?|el\s+mensaje\s+(?:debe\s+decir|es)?|el\s+mensaje\s*:|mensaje\s*:|que\s+diga|diciendo\s+que|con\s+el\s+mensaje|cuerpo\s*:?)\s*[:,]?\s*(.+)$",
+            clean,
+            re.IGNORECASE,
+        )
+        if body_match:
+            body = body_match.group(1).strip("¿?¡! \t\n\r")
+
+        # C. Extracción de Destinatario ("va dirigido a ...", "para ...", "a ...")
+        text_before = clean
+        cutoff_indices = []
+        if body_match:
+            cutoff_indices.append(body_match.start())
+        if subj_match:
+            cutoff_indices.append(subj_match.start())
+        if cutoff_indices:
+            text_before = clean[: min(cutoff_indices)].strip("¿?¡!., \t\n\r")
+
+        to_match = re.search(
+            r"(?:va\s+dirigido\s+a|dirigido\s+a|destinatario\s*:?|para|enviar\s+a|mandar\s+a|escribir\s+a|redactar\s+a|\ba\b)\s+(.+)$",
+            text_before,
+            re.IGNORECASE,
+        )
+        if to_match:
+            cand_to = to_match.group(1).strip("¿?¡!., ")
+            if cand_to.lower() not in ("mí", "mi", "nosotros", "ustedes", "migo", "conmigo"):
+                recipient = cand_to
+
+        # 3. Reutilizar borrador pendiente previo si la orden actual es correctiva o complementaria
+        # (ej. "necesito que abras gmail y escribas el mensaje" tras haber dictado el texto)
+        if not body and self._pending_email.get("body"):
+            body = self._pending_email["body"]
+        if not recipient and self._pending_email.get("to"):
+            recipient = self._pending_email["to"]
+        if not subject and self._pending_email.get("su"):
+            subject = self._pending_email["su"]
+
+        # Si aún no hay asunto pero hay cuerpo, sintetizar un asunto elegante
+        if not subject and body:
+            words = body.split()
+            if len(words) <= 5:
+                subject = " ".join(words).strip(".,!?:")
+            else:
+                subject = " ".join(words[:4]).strip(".,!?:") + "..."
+            subject = subject.capitalize()
+
+        # Guardar en memoria de borrador
+        self._pending_email = {
+            "to": recipient,
+            "su": subject,
+            "body": body,
+        }
+
+        # 4. Copiar cuerpo al portapapeles si existe
+        if body:
+            self.dictation.set_clipboard_text(body)
+
+        # 5. Construir URL de redacción de Gmail
+        params: Dict[str, str] = {"view": "cm", "fs": "1"}
+        if recipient:
+            params["to"] = recipient
+        if subject:
+            params["su"] = subject
+        if body:
+            params["body"] = body
+
+        gmail_compose_url = "https://mail.google.com/mail/?" + urllib.parse.urlencode(params)
+        wb.open(gmail_compose_url)
+
+        # 6. Formular respuesta clara, natural y verídica
+        if recipient and body:
+            msg = (
+                f"He abierto la ventana de redacción en Gmail para {recipient} con tu mensaje preparado y copiado al portapapeles, {self.config.user_name}. "
+                "Solo dale a Enviar cuando lo revises."
+            )
+        elif body:
+            msg = (
+                f"He abierto la ventana de redacción en Gmail con tu mensaje preparado y copiado al portapapeles, {self.config.user_name}. "
+                "Solo ingresa el destinatario y dale a Enviar."
+            )
+        elif recipient:
+            msg = (
+                f"He abierto la ventana de redacción en Gmail dirigida a {recipient}, {self.config.user_name}. "
+                "Dime qué mensaje deseas incluir o usa 'Ultrón, dicta...' y lo colocaré de inmediato."
+            )
+        else:
+            msg = (
+                f"Abriendo Gmail para redactar tu correo, {self.config.user_name}. "
+                "Puedes decirme a quién va dirigido y el mensaje, o dictarme diciendo 'Ultrón, dicta...' para copiarlo a tu portapapeles."
+            )
+
         self.tts.speak(msg, lang=lang)
         return msg
 
