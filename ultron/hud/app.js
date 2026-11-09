@@ -750,7 +750,28 @@
         state.ttsAnalyser.fftSize = 256;
         state.ttsAnalyser.smoothingTimeConstant = 0.78;
         const source = state.audioCtx.createMediaElementSource(dom.audioPlayer);
-        source.connect(state.ttsAnalyser);
+
+        // Ecualizador de Voz Ultrón Oscuro (Cuerpo grave + Presencia metálica fría)
+        const bassBoost = state.audioCtx.createBiquadFilter();
+        bassBoost.type = 'lowshelf';
+        bassBoost.frequency.value = 200;
+        bassBoost.gain.value = 6.5; // Resonancia profunda de pecho
+
+        const metallicFilter = state.audioCtx.createBiquadFilter();
+        metallicFilter.type = 'peaking';
+        metallicFilter.frequency.value = 1100;
+        metallicFilter.gain.value = 2.0;
+        metallicFilter.Q.value = 1.2;
+
+        const highCut = state.audioCtx.createBiquadFilter();
+        highCut.type = 'highshelf';
+        highCut.frequency.value = 5000;
+        highCut.gain.value = -4.5; // Atenúa siseos agudos
+
+        source.connect(bassBoost);
+        bassBoost.connect(metallicFilter);
+        metallicFilter.connect(highCut);
+        highCut.connect(state.ttsAnalyser);
         state.ttsAnalyser.connect(state.audioCtx.destination);
         state.mediaElementCon = true;
       } catch (e) {
@@ -1332,6 +1353,13 @@
           const audioUrl = URL.createObjectURL(blob);
           state.currentAudioUrl = audioUrl;
           dom.audioPlayer.src = audioUrl;
+
+          try {
+            dom.audioPlayer.preservesPitch = false;
+            dom.audioPlayer.mozPreservesPitch = false;
+            dom.audioPlayer.webkitPreservesPitch = false;
+            dom.audioPlayer.playbackRate = 0.92;
+          } catch (e) {}
 
           dom.audioPlayer.onended = () => {
             finishSpeakingAndResumeMic();

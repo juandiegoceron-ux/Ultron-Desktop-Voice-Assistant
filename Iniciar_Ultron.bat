@@ -10,6 +10,13 @@ echo           Ing. Biomedico: Juan Diego Ceron Duque
 echo ====================================================================
 echo.
 
+:: 0. Sincronización automática con GitHub si git está disponible
+git rev-parse --is-inside-work-tree >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [*] Sincronizando ultimas mejoras desde GitHub...
+    git pull origin main --quiet >nul 2>&1
+)
+
 :: 1. Verificar si existe entorno virtual local
 if exist "%~dp0.venv\Scripts\python.exe" (
     echo [*] Detectado entorno virtual (.venv)
@@ -52,8 +59,8 @@ pause
 exit /b 1
 
 :check_deps
-:: Verificar si falta la libreria requests u otras basicas en el entorno
-%RUN_CMD% -c "import requests" >nul 2>&1
+:: Verificar si falta alguna libreria critica en el entorno (requests, edge_tts)
+%RUN_CMD% -c "import requests, edge_tts" >nul 2>&1
 if %errorlevel% neq 0 (
     echo.
     echo [*] Detectamos que faltan librerias en este entorno de Python.
