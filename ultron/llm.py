@@ -201,51 +201,53 @@ class UltronBrain:
 
     def _ask_free_cloud_llm(self, prompt: str, system_prompt: str) -> Optional[str]:
         """
-        Motor LLM gratuito sin configuración con hasta 2 reintentos y doble endpoint
-        para evitar fallos por saturación momentánea.
+        Motor LLM gratuito sin configuración con baja latencia y detección de rate limits.
+        Prioriza llamadas de < 1.5s y evita bloqueos largos de conexión.
         """
         headers = {
             "Content-Type": "application/json",
-            "User-Agent": "UltronDesktopAssistant/3.2",
+            "User-Agent": "UltronDesktopAssistant/5.2",
         }
-        for attempt in range(2):
-            try:
-                payload = {
-                    "model": "openai",
-                    "seed": random.randint(1, 999999),
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt},
-                    ],
-                    "temperature": 0.6,
-                }
-                resp = requests.post(
-                    "https://text.pollinations.ai/openai",
-                    json=payload,
-                    headers=headers,
-                    timeout=14,
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    choices = data.get("choices") or []
-                    if choices:
-                        content = choices[0].get("message", {}).get("content", "").strip()
-                        if content:
-                            return content
-            except Exception as exc:
-                logger.debug("Intento %d fallido en endpoint primario: %s", attempt + 1, exc)
 
-            try:
-                encoded_q = urllib.parse.quote(prompt)
-                encoded_sys = urllib.parse.quote(system_prompt)
-                url = f"https://text.pollinations.ai/{encoded_q}?model=openai&seed={random.randint(1, 99999)}&system={encoded_sys}"
-                resp2 = requests.get(url, headers=headers, timeout=14)
-                if resp2.status_code == 200 and resp2.text.strip():
-                    return resp2.text.strip()
-            except Exception as exc:
-                logger.debug("Intento %d fallido en endpoint secundario: %s", attempt + 1, exc)
+        # 1. Intento primario: GET directo ultra-rápido (< 800ms)
+        try:
+            encoded_q = urllib.parse.quote(prompt[:280])
+            encoded_sys = urllib.parse.quote(system_prompt[:220])
+            url = f"https://text.pollinations.ai/{encoded_q}?system={encoded_sys}"
+            resp = requests.get(url, headers=headers, timeout=4.5)
+            if resp.status_code == 200 and resp.text.strip():
+                body = resp.text.strip()
+                if "Free limit reached" not in body and "unlimited replies" not in body:
+                    return body
+        except Exception as exc:
+            logger.debug("GET rápido cloud falló: %s", exc)
 
-            if attempt == 0:
-                time.sleep(0.8)
+        # 2. Intento secundario: POST OpenAI compatible
+        try:
+            payload = {
+                "model": "openai",
+                "seed": random.randint(1, 999999),
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.5,
+            }
+            resp2 = requests.post(
+                "https://text.pollinations.ai/openai",
+                json=payload,
+                headers=headers,
+                timeout=5.0,
+            )
+            if resp2.status_code == 200:
+                data = resp2.json()
+                choices = data.get("choices") or []
+                if choices:
+                    content = choices[0].get("message", {}).get("content", "").strip()
+                    if content and "Free limit reached" not in content:
+                        return content
+        except Exception as exc:
+            logger.debug("POST secundario cloud falló: %s", exc)
 
         return None
+

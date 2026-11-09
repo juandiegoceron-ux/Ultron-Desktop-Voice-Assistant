@@ -58,11 +58,16 @@ class UltronAssistant:
 
     def _strip_wake_prefix(self, text: str) -> str:
         """
-        Elimina invocaciones como 'ultrón', 'hey ultrón', 'oye ultrón' al inicio de la frase
-        incluso cuando se ejecuta con `--no-wake`.
+        Elimina invocaciones como 'ultrón', 'hey ultrón', 'oye ultrón', y homófonos
+        comunes de transcripción fonética ('el trono', 'al trono', 'a una ultron', 'el tron')
+        al inicio de la frase incluso cuando se ejecuta con `--no-wake`.
         """
         cleaned = text.strip()
-        pattern = r"^\s*(?:hey\s+|oye\s+|hola\s+)?(?:ultr[oó]n|mult[oó]n)\b[\s,.:;!?-]*(.*)$"
+        pattern = (
+            r"^\s*(?:hey\s+|oye\s+|hola\s+|ok\s+|a\s+una\s+|a\s+un\s+|al\s+|el\s+)?"
+            r"(?:ultr[oó]n|mult[oó]n|trono|tron|trozo|oultron|oltron|el\s+trono|al\s+trono)"
+            r"\b[\s,.:;!?-]*(.*)$"
+        )
         match = re.match(pattern, cleaned, flags=re.IGNORECASE)
         if match:
             return match.group(1).strip()
@@ -172,26 +177,55 @@ class UltronAssistant:
             return self.skills.organize_files(query=stripped, lang=out_lang)
 
         # 2.6 Jarvis Pro: Edición In-Place de Portapapeles / Texto Seleccionado
-        clipboard_edit_triggers = (
-            "traduce el texto copiado",
-            "traduce lo que copié",
-            "traduce lo que copie",
-            "traduce mi portapapeles",
-            "mejora el texto copiado",
-            "mejora este texto",
-            "corrige el texto copiado",
-            "haz más formal el texto",
-            "haz mas formal el texto",
-            "refactoriza el código copiado",
-            "refactoriza el codigo copiado",
-            "resume el texto copiado",
-            "edita el texto copiado",
-            "edita el texto seleccionado",
-            "edit clipboard",
-            "translate clipboard",
-            "improve copied text",
+        has_clipboard_kw = any(
+            w in query
+            for w in (
+                "texto copiado",
+                "portapapeles",
+                "lo que copié",
+                "lo que copie",
+                "texto seleccionado",
+                "copied text",
+                "clipboard",
+            )
         )
-        if any(trigger in query for trigger in clipboard_edit_triggers):
+        has_action_kw = any(
+            w in query
+            for w in (
+                "mejora",
+                "mejor en",
+                "mejorar",
+                "corrige",
+                "corregir",
+                "traduce",
+                "traducir",
+                "formal",
+                "refactoriza",
+                "refactorizar",
+                "resume",
+                "resumir",
+                "edita",
+                "editar",
+                "limpia",
+                "limpiar",
+                "arregla",
+                "arreglar",
+                "improve",
+                "translate",
+                "edit",
+                "clean",
+            )
+        )
+        if (has_clipboard_kw and has_action_kw) or any(
+            trigger in query
+            for trigger in (
+                "mejora este texto",
+                "corrige este texto",
+                "edita este texto",
+                "traduce este texto",
+                "refactoriza este código",
+            )
+        ):
             return self.skills.edit_clipboard_text(instruction=stripped, lang=out_lang)
 
         # 2.7 Jarvis Pro: Dictado Inteligente con Auto-Corrección ("dicta ...", "escribe esto ...")
@@ -296,6 +330,58 @@ class UltronAssistant:
             )
             self.tts.speak(msg, lang=out_lang)
             return msg
+
+        # 7.8 Envío y Redacción de Correo Electrónico ("quiero enviar un correo", "redactar correo", etc.)
+        if (
+            any(
+                w in query
+                for w in (
+                    "enviar un correo",
+                    "enviar correo",
+                    "mandar un correo",
+                    "mandar correo",
+                    "redactar un correo",
+                    "redactar correo",
+                    "escribir un correo",
+                    "send email",
+                    "write email",
+                    "compose email",
+                )
+            )
+            or (
+                "correo" in query
+                and any(
+                    v in query
+                    for v in (
+                        "enviar",
+                        "mandar",
+                        "redactar",
+                        "escribir",
+                        "nuevo",
+                        "ayuda",
+                        "ayudar",
+                        "abrir",
+                        "abre",
+                        "quiero",
+                    )
+                )
+            )
+        ):
+            return self.skills.compose_email(query=stripped, lang=out_lang)
+
+        # 7.9 Explicación Instantánea Local de Control PID (Biomédica / Automatización)
+        if any(
+            w in query
+            for w in (
+                "qué sabes del pid",
+                "que sabes del pid",
+                "qué es un pid",
+                "que es un pid",
+                "controlador pid",
+                "control pid",
+            )
+        ) or query in ("pid", "el pid"):
+            return self.skills.explain_pid(lang=out_lang)
 
         # 8. Búsquedas o reproducción en Spotify ("reproduce a ryan castro en spotify", "pon ... en spotify", "busca en spotify...")
         if "spotify" in query and any(

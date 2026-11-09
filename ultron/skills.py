@@ -555,3 +555,30 @@ class UltronSkills:
         self.tts.speak(msg, lang=lang)
         return f"{msg}\nResultado:\n{res.output_text}"
 
+    # ──────────────────────────────────────────────────────────────────────
+    # 13. Productivity & Local Knowledge Shortcuts (Email + PID Controller)
+    # ──────────────────────────────────────────────────────────────────────
+
+    def compose_email(self, query: str = "", lang: str = "es") -> str:
+        """Abre Gmail para redactar un correo y asiste con dictado por voz."""
+        gmail_compose_url = "https://mail.google.com/mail/u/0/#inbox?compose=new"
+        wb.open(gmail_compose_url)
+        msg = (
+            f"Abriendo Gmail para redactar tu correo, {self.config.user_name}. "
+            "Puedes dictarme el contenido diciendo 'Ultrón, dicta...' y lo tendrás en tu portapapeles listo para pegar con Ctrl+V."
+        )
+        self.tts.speak(msg, lang=lang)
+        return msg
+
+    def explain_pid(self, lang: str = "es") -> str:
+        """Explicación técnica instantánea de lazo de control PID para ingeniería biomédica y automatización."""
+        msg = (
+            "El controlador PID (Proporcional-Integral-Derivativo) calcula continuamente el error entre el setpoint deseado "
+            "y la variable de proceso medida. Ajusta la salida con tres términos: proporcional al error instantáneo, "
+            "integral de los errores acumulados y derivativo de la velocidad de cambio del error. En tu proyecto Bola-Viga en Arduino, "
+            "permite balancear la esfera en la posición exacta del riel con mínimo sobretiro y rápida estabilización."
+        )
+        self.tts.speak(msg, lang=lang)
+        return msg
+
+

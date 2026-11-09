@@ -13,6 +13,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from ultron.assistant import UltronAssistant
 from ultron.config import UltronConfig
@@ -127,6 +128,37 @@ class TestUltronAssistant(unittest.TestCase):
     def test_identity_question_instant_response(self) -> None:
         resp = self.assistant.process_command("okay qué eres tú")
         self.assertIn("asistente de escritorio con inteligencia artificial", resp)
+
+    def test_phonetic_homophone_wake_word_stripping(self) -> None:
+        # 'El trono mejor en texto copiado' should strip 'El trono' and route to clipboard editor
+        with patch.object(self.assistant.skills.dictation, "edit_selected_or_clipboard_text") as mock_edit:
+            from ultron.jarvis_pro import DictationResult
+            mock_edit.return_value = DictationResult(
+                original_text="hola",
+                processed_text="Hola, ¿cómo estás?",
+                mode="edit_selection",
+                copied_to_clipboard=True,
+                pasted_to_window=False,
+                message="Texto transformado",
+            )
+            resp = self.assistant.process_command("El trono mejor en texto copiado.")
+            self.assertIn("Texto transformado", resp)
+            mock_edit.assert_called_once()
+
+    def test_a_una_ultron_homophone_opening_spotify(self) -> None:
+        resp = self.assistant.process_command("A una ultron abre spotify")
+        self.assertIn("Spotify", resp)
+
+    def test_compose_email_shortcut_routing(self) -> None:
+        with patch("ultron.skills.wb.open") as mock_wb:
+            resp = self.assistant.process_command("Quiero enviar un correo, me puedes ayudar.")
+            self.assertIn("Gmail", resp)
+            mock_wb.assert_called_once_with("https://mail.google.com/mail/u/0/#inbox?compose=new")
+
+    def test_pid_controller_instant_explanation(self) -> None:
+        resp = self.assistant.process_command("qué sabes del pid")
+        self.assertIn("Proporcional-Integral-Derivativo", resp)
+        self.assertIn("Bola-Viga", resp)
 
 
 if __name__ == "__main__":
