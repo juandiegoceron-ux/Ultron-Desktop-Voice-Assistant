@@ -1,11 +1,11 @@
 /**
- * ULTRÓN v4.0 — STARK TACTICAL HUD FRONTEND ENGINE
+ * ULTRÓN v5.0 — 21ST.DEV SPATIAL GLASS & VOLUMETRIC SHADER HUD ENGINE
  * Architecture:
  * 1. Real-Time Hardware Telemetry & Process Monitor (/api/telemetry @ 2.5s)
- * 2. 60 FPS WebAudio Acoustic Reactor Core (AnalyserNode + Synthetic Harmonic Fallback)
+ * 2. 60 FPS 3D Volumetric Liquid Plasma / Harmonic Shader Orb (WebAudio AnalyserNode + 40 Orbital Particles)
  * 3. Low-Latency Continuous Voice Engine with 1700ms Smart Silence Debounce & Push-to-Talk
  * 4. Neural TTS Playback (/api/tts Edge-TTS MP3 + WebAudio Spectrum + WebSpeech Fallback)
- * 5. Quick Launch Deck & Multimodal Desktop Vision Studio (/api/vision)
+ * 5. 21st.dev / Raycast Command Palette (Ctrl+K), Interactive Suggestion Chips & Vision Studio (/api/vision)
  */
 
 (() => {
@@ -18,6 +18,136 @@
   const SILENCE_DEBOUNCE_MS = 1700;
   const RESUME_MIC_DELAY_MS = 350;
   const GAUGE_CIRCUMFERENCE = 2 * Math.PI * 40; // r = 40 -> 251.327
+
+  // Crisp Inline Vector SVG Library (Zero Emojis Anywhere)
+  const SVG_ICONS = {
+    userAvatar:
+      '<svg class="svg-icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>',
+    ultronAvatar:
+      '<svg class="svg-icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>',
+    speakerWave:
+      '<svg class="svg-icon icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>',
+    eyeScan:
+      '<svg class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>',
+    spinner:
+      '<svg class="svg-icon icon-sm spin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>',
+    mic:
+      '<svg class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>',
+    recordPulse:
+      '<svg class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4" fill="currentColor"></circle></svg>',
+    rocket:
+      '<svg class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path></svg>',
+    cube:
+      '<svg class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>',
+    calendar:
+      '<svg class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>',
+    music:
+      '<svg class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M8 14.5c2.5-1 5.5-1 8 0"></path><path d="M7 11.5c3.2-1.2 6.8-1.2 10 0"></path></svg>',
+    code:
+      '<svg class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline><line x1="14" y1="4" x2="10" y2="20"></line></svg>',
+    pulse:
+      '<svg class="svg-icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>',
+  };
+
+  // 21st.dev / Raycast Command Palette Catalog
+  const COMMAND_PALETTE_ITEMS = [
+    {
+      id: 'cmd-nutricoach',
+      title: 'NutriCoach Pro',
+      subtitle: 'abre nutricoach — Lanzar plataforma de nutrición IA',
+      category: 'PROYECTO',
+      icon: SVG_ICONS.rocket,
+      action: () => sendCommand('abre nutricoach'),
+    },
+    {
+      id: 'cmd-inventario',
+      title: 'Inventario Web Pro',
+      subtitle: 'abre inventario — Lanzar sistema de gestión de inventario',
+      category: 'PROYECTO',
+      icon: SVG_ICONS.cube,
+      action: () => sendCommand('abre inventario'),
+    },
+    {
+      id: 'cmd-calendar',
+      title: 'Google Calendar',
+      subtitle: 'abre google calendar — Consultar agenda y eventos',
+      category: 'PRODUCTIVIDAD',
+      icon: SVG_ICONS.calendar,
+      action: () => sendCommand('abre google calendar'),
+    },
+    {
+      id: 'cmd-spotify',
+      title: 'Spotify',
+      subtitle: 'abre spotify — Iniciar reproductor musical',
+      category: 'MEDIA',
+      icon: SVG_ICONS.music,
+      action: () => sendCommand('abre spotify'),
+    },
+    {
+      id: 'cmd-vscode',
+      title: 'VS Code',
+      subtitle: 'abre vscode — Abrir entorno de desarrollo integrado',
+      category: 'DEV TOOLS',
+      icon: SVG_ICONS.code,
+      action: () => sendCommand('abre vscode'),
+    },
+    {
+      id: 'cmd-diagnostico',
+      title: 'Diagnóstico de Hardware',
+      subtitle: 'analiza mi sistema — Auditoría completa de CPU, RAM, Disco y Red',
+      category: 'TELEMETRÍA',
+      icon: SVG_ICONS.pulse,
+      action: () => sendCommand('analiza mi sistema'),
+    },
+    {
+      id: 'cmd-vision-general',
+      title: 'Visión: Inspección General',
+      subtitle: 'Captura el escritorio y ofrece recomendaciones técnicas',
+      category: 'VISIÓN VLM',
+      icon: SVG_ICONS.eyeScan,
+      action: () =>
+        runVisionAnalysis(
+          '¿Qué hay en mi pantalla y qué recomendaciones técnicas tienes?',
+          'general'
+        ),
+    },
+    {
+      id: 'cmd-vision-debug',
+      title: 'Visión: Depurar Código',
+      subtitle: 'Inspecciona errores de código, stacktraces o consola en vivo',
+      category: 'VISIÓN VLM',
+      icon: SVG_ICONS.code,
+      action: () =>
+        runVisionAnalysis(
+          'Analiza el código o la terminal en mi pantalla y detecta posibles errores o mejoras.',
+          'debug'
+        ),
+    },
+    {
+      id: 'cmd-vision-ux',
+      title: 'Visión: Auditoría UX',
+      subtitle: 'Evalúa jerarquía visual, contraste y alineación de la interfaz',
+      category: 'VISIÓN VLM',
+      icon: SVG_ICONS.eyeScan,
+      action: () =>
+        runVisionAnalysis(
+          'Realiza una auditoría UX/UI de la interfaz en pantalla verificando contraste y diseño.',
+          'ux_audit'
+        ),
+    },
+    {
+      id: 'cmd-vision-pid',
+      title: 'Visión: Control PID',
+      subtitle: 'Analiza señales biomédicas, sobretiro y estabilidad de lazo PID',
+      category: 'VISIÓN VLM',
+      icon: SVG_ICONS.pulse,
+      action: () =>
+        runVisionAnalysis(
+          'Analiza las señales y gráficas del lazo de control PID en pantalla.',
+          'biomedical_pid'
+        ),
+    },
+  ];
 
   const state = {
     ultronState: 'idle', // 'idle' | 'listening' | 'processing' | 'speaking'
@@ -39,6 +169,9 @@
     ttsAnalyser: null,
     micStream: null,
     mediaElementCon: false,
+    cmdPaletteOpen: false,
+    cmdPaletteSelectedIndex: 0,
+    filteredCommands: [...COMMAND_PALETTE_ITEMS],
   };
 
   // ==========================================================================
@@ -46,6 +179,8 @@
   // ==========================================================================
   const dom = {
     // Topbar
+    cmdPaletteTriggerBtn: document.getElementById('cmd-palette-trigger-btn'),
+    dockCmdPaletteBtn: document.getElementById('dock-cmd-palette-btn'),
     connectionPill: document.getElementById('connection-status-pill'),
     systemStatusText: document.getElementById('system-status-text'),
     apiLatencyMs: document.getElementById('api-latency-ms'),
@@ -83,7 +218,7 @@
     telemetryUpdatedAt: document.getElementById('telemetry-updated-at'),
     topProcessesBody: document.getElementById('top-processes-body'),
 
-    // Center Column: Reactor + Voice + Console
+    // Center Column: Compact Shader Orb + Stream + Dock
     langEsBtn: document.getElementById('lang-es-btn'),
     langEnBtn: document.getElementById('lang-en-btn'),
     activeLangBadge: document.getElementById('active-lang-badge'),
@@ -100,6 +235,7 @@
     transcriptDot: document.getElementById('transcript-activity-dot'),
     liveTranscript: document.getElementById('live-transcript'),
     flushTranscriptBtn: document.getElementById('flush-transcript-btn'),
+    suggestionChips: document.getElementById('suggestion-chips'),
     chatLog: document.getElementById('chat-log'),
     clearChatBtn: document.getElementById('clear-chat-btn'),
     commandForm: document.getElementById('command-form'),
@@ -120,7 +256,11 @@
     visionLatencyTag: document.getElementById('vision-latency-tag'),
     visionAnalysisOutput: document.getElementById('vision-analysis-output'),
 
-    // Lightbox Modal & Audio Player
+    // Modals & Audio Player
+    cmdPaletteModal: document.getElementById('command-palette-modal'),
+    cmdPaletteInput: document.getElementById('cmd-palette-input'),
+    cmdPaletteList: document.getElementById('cmd-palette-list'),
+    cmdPaletteCloseBtn: document.getElementById('cmd-palette-close-btn'),
     lightboxModal: document.getElementById('vision-lightbox-modal'),
     lightboxImg: document.getElementById('lightbox-img'),
     lightboxCloseBtn: document.getElementById('lightbox-close-btn'),
@@ -132,7 +272,9 @@
   // ==========================================================================
   function setUltronState(newState) {
     state.ultronState = newState;
+    const visualState = newState === 'idle' ? 'listening' : newState;
     document.body.setAttribute('data-ultron-state', newState);
+    document.body.setAttribute('data-state', visualState);
     if (!dom.reactorStateBadge) return;
 
     dom.reactorStateBadge.setAttribute('data-state', newState);
@@ -146,7 +288,7 @@
         dom.bargeInBtn.classList.add('hidden');
         break;
       case 'speaking':
-        dom.reactorStateBadge.textContent = 'ULTRÓN HABLANDO (CLIC PARA INTERRUMPIR)';
+        dom.reactorStateBadge.textContent = 'ULTRÓN HABLANDO';
         dom.bargeInBtn.classList.remove('hidden');
         break;
       default:
@@ -185,9 +327,19 @@
     const metaBar = document.createElement('div');
     metaBar.className = 'chat-meta';
 
+    const senderWrap = document.createElement('div');
+    senderWrap.className = 'chat-sender-wrap';
+
+    const avatarBadge = document.createElement('span');
+    avatarBadge.className = 'chat-avatar-badge';
+    avatarBadge.innerHTML = isUser ? SVG_ICONS.userAvatar : SVG_ICONS.ultronAvatar;
+
     const senderSpan = document.createElement('span');
     senderSpan.className = 'chat-sender';
     senderSpan.textContent = sender;
+
+    senderWrap.appendChild(avatarBadge);
+    senderWrap.appendChild(senderSpan);
 
     const badgesWrap = document.createElement('div');
     badgesWrap.className = 'chat-badges';
@@ -215,14 +367,15 @@
       replayBtn.type = 'button';
       replayBtn.className = 'replay-tts-btn';
       replayBtn.title = 'Reproducir respuesta por voz';
-      replayBtn.textContent = '🔊';
+      replayBtn.setAttribute('aria-label', 'Reproducir respuesta por voz');
+      replayBtn.innerHTML = SVG_ICONS.speakerWave;
       replayBtn.addEventListener('click', () => {
         speakResponse(text, 'es');
       });
       badgesWrap.appendChild(replayBtn);
     }
 
-    metaBar.appendChild(senderSpan);
+    metaBar.appendChild(senderWrap);
     metaBar.appendChild(badgesWrap);
 
     const bodyDiv = document.createElement('div');
@@ -343,11 +496,11 @@
       // Network & Battery Metrics
       const net = data.network || {};
       dom.netStatus.textContent = net.is_connected !== false ? 'ONLINE' : 'OFFLINE';
-      dom.netTraffic.textContent = `↑ ${Number(net.bytes_sent_mb || 0).toFixed(1)} MB · ↓ ${Number(net.bytes_recv_mb || 0).toFixed(1)} MB`;
+      dom.netTraffic.textContent = `↑ ${Number(net.bytes_sent_mb || 0).toFixed(1)} · ↓ ${Number(net.bytes_recv_mb || 0).toFixed(1)} MB`;
 
       const bat = data.battery || {};
       if (bat.present && bat.percent !== null && bat.percent !== undefined) {
-        const plugStr = bat.power_plugged ? 'AC CONECTADO' : 'EN BATERÍA';
+        const plugStr = bat.power_plugged ? 'AC' : 'BAT';
         dom.batteryStatus.textContent = `${Number(bat.percent).toFixed(0)}% · ${plugStr}`;
       } else {
         dom.batteryStatus.textContent = 'AC CONECTADO';
@@ -410,7 +563,7 @@
   }
 
   // ==========================================================================
-  // 2. WEBAUDIO PIPELINE & 60 FPS CANVAS ACOUSTIC REACTOR CORE
+  // 2. WEBAUDIO PIPELINE & 60 FPS 3D VOLUMETRIC SHADER ORB
   // ==========================================================================
   function ensureAudioContext() {
     if (!state.audioCtx) {
@@ -432,7 +585,7 @@
         state.ttsAnalyser.connect(state.audioCtx.destination);
         state.mediaElementCon = true;
       } catch (e) {
-        // Fallback if already connected or restricted
+        // Fallback if already connected
       }
     }
   }
@@ -459,7 +612,7 @@
         micSource.connect(state.micAnalyser);
       }
     } catch (err) {
-      // Continues smoothly with synthetic harmonic visualizer if mic permission denied
+      // Continues smoothly with synthetic harmonic shader if mic permission denied
     }
   }
 
@@ -471,9 +624,27 @@
     const waveBins = new Uint8Array(128);
     let phase = 0;
 
+    // 40 Reactive 3D Orbital Quantum Particles
+    const PARTICLE_COUNT = 40;
+    const particles = Array.from({ length: PARTICLE_COUNT }, (_, idx) => ({
+      theta: (idx / PARTICLE_COUNT) * Math.PI * 2,
+      phi: Math.acos(2 * ((idx * 0.6180339887) % 1) - 1),
+      radius: 36 + (idx % 5) * 5.5,
+      speed: 0.008 + (idx % 7) * 0.0025,
+      size: 1.1 + (idx % 3) * 0.55,
+    }));
+
+    // 4 Volumetric Plasma Ribbon Layers
+    const plasmaRibbons = [
+      { freq1: 3, freq2: 5, speed: 1.1, baseRadius: 31, amp: 10, alpha: 0.42 },
+      { freq1: 4, freq2: 3, speed: -0.85, baseRadius: 29, amp: 12, alpha: 0.36 },
+      { freq1: 2, freq2: 6, speed: 1.45, baseRadius: 26, amp: 9, alpha: 0.32 },
+      { freq1: 5, freq2: 4, speed: -1.25, baseRadius: 33, amp: 8, alpha: 0.25 },
+    ];
+
     function renderFrame(timestamp) {
       const dpr = window.devicePixelRatio || 1;
-      const displaySize = 220;
+      const displaySize = 128;
       if (canvas.width !== displaySize * dpr || canvas.height !== displaySize * dpr) {
         canvas.width = displaySize * dpr;
         canvas.height = displaySize * dpr;
@@ -485,7 +656,6 @@
 
       const cx = displaySize / 2;
       const cy = displaySize / 2;
-      phase += 0.025;
 
       // Sample real WebAudio spectrum if available, else generate organic harmonic envelope
       let activeAnalyser = null;
@@ -506,7 +676,6 @@
         avgEnergy = sum / (64 * 255);
       }
 
-      // If speaking via fallback speechSynthesis or low WebAudio signal during speech, inject syllable modulation
       if (state.ultronState === 'speaking' && avgEnergy < 0.05) {
         const t = timestamp * 0.008;
         for (let i = 0; i < 64; i++) {
@@ -514,22 +683,24 @@
             Math.sin(t * 2.3 + i * 0.25) * 0.5 +
             Math.cos(t * 5.1 - i * 0.15) * 0.35 +
             Math.sin(t * 1.1) * 0.25;
-          freqBins[i] = Math.max(18, Math.min(245, Math.floor(Math.abs(syllabicWave) * 210)));
+          freqBins[i] = Math.max(18, Math.min(245, Math.floor(Math.abs(syllabicWave) * 215)));
         }
-        avgEnergy = 0.42 + 0.22 * Math.sin(t * 3.4);
+        avgEnergy = 0.44 + 0.24 * Math.sin(t * 3.4);
       } else if (state.ultronState === 'processing') {
-        const t = timestamp * 0.01;
+        const t = timestamp * 0.012;
         for (let i = 0; i < 64; i++) {
-          freqBins[i] = Math.floor(60 + 55 * Math.sin(t + i * 0.3));
+          freqBins[i] = Math.floor(70 + 60 * Math.sin(t + i * 0.3));
         }
-        avgEnergy = 0.28;
+        avgEnergy = 0.32;
       } else if (avgEnergy < 0.02) {
-        const t = timestamp * 0.003;
+        const t = timestamp * 0.0035;
         for (let i = 0; i < 64; i++) {
-          freqBins[i] = Math.floor(10 + 8 * Math.sin(t + i * 0.2));
+          freqBins[i] = Math.floor(14 + 10 * Math.sin(t + i * 0.2));
         }
-        avgEnergy = 0.04;
+        avgEnergy = 0.06;
       }
+
+      phase += 0.022 + avgEnergy * 0.055;
 
       // Update RMS dBFS readout
       if (dom.audioRmsReadout && Math.floor(timestamp) % 4 === 0) {
@@ -537,100 +708,139 @@
         dom.audioRmsReadout.textContent = `${db} dBFS`;
       }
 
-      // Choose tactical palette by state
-      let primaryHue = 192;
-      let primarySat = 92;
-      let primaryLight = 52;
+      // Select 21st.dev Volumetric Shader Palette by Ultrón State
+      let coreRgb = '0, 240, 255'; // Electric Cyan
+      let secondaryRgb = '56, 189, 248'; // Sky Blue
+      let tertiaryRgb = '99, 102, 241'; // Indigo Plasma
       if (state.ultronState === 'speaking') {
-        primaryHue = 352;
-        primarySat = 88;
-        primaryLight = 58;
+        coreRgb = '255, 42, 95'; // Ultron Crimson
+        secondaryRgb = '244, 63, 94'; // Rose Neon
+        tertiaryRgb = '217, 70, 239'; // Magenta Plasma
       } else if (state.ultronState === 'processing') {
-        primaryHue = 34;
-        primarySat = 95;
-        primaryLight = 56;
+        coreRgb = '245, 158, 11'; // Quantum Amber
+        secondaryRgb = '251, 191, 36'; // Solar Gold
+        tertiaryRgb = '249, 115, 22'; // Deep Orange
       }
 
-      const mainColor = `hsl(${primaryHue}, ${primarySat}%, ${primaryLight}%)`;
-      const glowColor = `hsla(${primaryHue}, ${primarySat}%, ${primaryLight}%, 0.22)`;
-      const dimColor = `hsla(${primaryHue}, ${primarySat}%, ${primaryLight}%, 0.35)`;
-
-      // 1. Outer Azimuth Calibration Ring (60 precision ticks)
-      const outerRadius = 102;
-      for (let i = 0; i < 60; i++) {
-        const angle = (i / 60) * Math.PI * 2;
-        const isMajor = i % 5 === 0;
-        const innerTick = isMajor ? outerRadius - 6 : outerRadius - 3;
-        ctx.beginPath();
-        ctx.moveTo(cx + Math.cos(angle) * innerTick, cy + Math.sin(angle) * innerTick);
-        ctx.lineTo(cx + Math.cos(angle) * outerRadius, cy + Math.sin(angle) * outerRadius);
-        ctx.strokeStyle = isMajor ? dimColor : 'hsla(215, 16%, 35%, 0.35)';
-        ctx.lineWidth = isMajor ? 1.4 : 0.8;
-        ctx.stroke();
-      }
-
-      // 2. Counter-Rotating Segmented Tactical Arcs
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(phase * (state.ultronState === 'processing' ? 2.4 : 0.6));
-      ctx.strokeStyle = dimColor;
-      ctx.lineWidth = 1.5;
-      for (let seg = 0; seg < 4; seg++) {
-        ctx.beginPath();
-        ctx.arc(0, 0, 88, seg * (Math.PI / 2) + 0.15, (seg + 1) * (Math.PI / 2) - 0.25);
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      // 3. 64-Bin Radial Frequency Spectrum Bars
-      const baseBarRadius = 56;
-      const numBars = 64;
+      // 1. Outer 48-Bin Precision Radial Frequency Halo
+      const haloBaseR = 49;
+      const numBars = 48;
       for (let i = 0; i < numBars; i++) {
         const angle = (i / numBars) * Math.PI * 2 - Math.PI / 2;
-        const val = freqBins[i] / 255;
-        const barLen = 4 + val * 26;
-        const x1 = cx + Math.cos(angle) * baseBarRadius;
-        const y1 = cy + Math.sin(angle) * baseBarRadius;
-        const x2 = cx + Math.cos(angle) * (baseBarRadius + barLen);
-        const y2 = cy + Math.sin(angle) * (baseBarRadius + barLen);
+        const binVal = freqBins[i] / 255;
+        const barLen = 2 + binVal * 11;
+        const x1 = cx + Math.cos(angle) * haloBaseR;
+        const y1 = cy + Math.sin(angle) * haloBaseR;
+        const x2 = cx + Math.cos(angle) * (haloBaseR + barLen);
+        const y2 = cy + Math.sin(angle) * (haloBaseR + barLen);
 
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
-        ctx.strokeStyle = val > 0.45 ? mainColor : dimColor;
-        ctx.lineWidth = 2.1;
+        ctx.strokeStyle =
+          binVal > 0.42 ? `rgba(${coreRgb}, 0.85)` : `rgba(${secondaryRgb}, 0.28)`;
+        ctx.lineWidth = 1.5;
         ctx.lineCap = 'round';
         ctx.stroke();
       }
 
-      // 4. Inner Core & Oscilloscope Ring
-      const coreRadius = 36 + avgEnergy * 12;
-      const grad = ctx.createRadialGradient(cx, cy, 4, cx, cy, coreRadius * 1.4);
-      grad.addColorStop(0, mainColor);
-      grad.addColorStop(0.55, glowColor);
-      grad.addColorStop(1, 'transparent');
+      // 2. Multi-Layered Volumetric Liquid Plasma / Harmonic Ribbons (screen blend)
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+
+      for (let rIdx = 0; rIdx < plasmaRibbons.length; rIdx++) {
+        const rib = plasmaRibbons[rIdx];
+        const vertices = 60;
+        ctx.beginPath();
+
+        for (let v = 0; v <= vertices; v++) {
+          const theta = (v / vertices) * Math.PI * 2;
+          const binSample = freqBins[(v * 2 + rIdx * 7) % 64] / 255;
+          const harmonicOffset =
+            Math.sin(theta * rib.freq1 + phase * rib.speed) *
+              (2.2 + avgEnergy * rib.amp) +
+            Math.cos(theta * rib.freq2 - phase * rib.speed * 0.8) *
+              (1.6 + binSample * (rib.amp * 0.65));
+
+          const rad = rib.baseRadius + avgEnergy * 7 + harmonicOffset;
+          const vx = cx + Math.cos(theta) * rad;
+          const vy = cy + Math.sin(theta) * rad;
+
+          if (v === 0) {
+            ctx.moveTo(vx, vy);
+          } else {
+            ctx.lineTo(vx, vy);
+          }
+        }
+        ctx.closePath();
+
+        const ribbonGrad = ctx.createRadialGradient(cx, cy, 2, cx, cy, 48);
+        const layerRgb = rIdx % 2 === 0 ? coreRgb : rIdx === 1 ? secondaryRgb : tertiaryRgb;
+        ribbonGrad.addColorStop(0, `rgba(255, 255, 255, ${rib.alpha * 0.9})`);
+        ribbonGrad.addColorStop(0.45, `rgba(${layerRgb}, ${rib.alpha})`);
+        ribbonGrad.addColorStop(1, `rgba(${tertiaryRgb}, 0.02)`);
+
+        ctx.fillStyle = ribbonGrad;
+        ctx.fill();
+
+        ctx.strokeStyle = `rgba(${layerRgb}, ${0.45 + avgEnergy * 0.35})`;
+        ctx.lineWidth = 1.15;
+        ctx.stroke();
+      }
+
+      // 3. 3D Tilted Elliptical Orbital Rings (ctx.ellipse)
+      const numRings = 3;
+      for (let k = 0; k < numRings; k++) {
+        ctx.save();
+        ctx.translate(cx, cy);
+        const tiltAngle = phase * (k % 2 === 0 ? 0.55 : -0.45) + (k * Math.PI) / 3;
+        const rx = 43 + k * 3 + avgEnergy * 6;
+        const ry = 14 + k * 4 + Math.sin(phase * 0.7 + k) * 4;
+
+        ctx.beginPath();
+        ctx.ellipse(0, 0, rx, Math.max(6, Math.abs(ry)), tiltAngle, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(${k === 0 ? coreRgb : secondaryRgb}, ${0.32 + avgEnergy * 0.3})`;
+        ctx.lineWidth = 1.1;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 4. 40 Floating Reactive 3D Energy Particles
+      const speedBoost = 1 + avgEnergy * 4.2;
+      for (let pIdx = 0; pIdx < particles.length; pIdx++) {
+        const p = particles[pIdx];
+        p.theta += p.speed * speedBoost;
+        const r3d = p.radius + avgEnergy * 9;
+
+        const x3d = r3d * Math.sin(p.phi) * Math.cos(p.theta);
+        const y3d = r3d * Math.cos(p.phi);
+        const z3d = r3d * Math.sin(p.phi) * Math.sin(p.theta);
+
+        // Perspective projection
+        const perspective = 110 / (110 - z3d);
+        const px = cx + x3d * perspective;
+        const py = cy + y3d * perspective;
+        const alpha = Math.max(0.15, Math.min(0.95, (z3d + r3d) / (2 * r3d)));
+
+        ctx.beginPath();
+        ctx.arc(px, py, p.size * perspective, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${pIdx % 3 === 0 ? '255, 255, 255' : coreRgb}, ${alpha})`;
+        ctx.fill();
+      }
+
+      // 5. Inner Singularity Specular Core
+      const innerR = 16 + avgEnergy * 8;
+      const coreGrad = ctx.createRadialGradient(cx - 3, cy - 3, 1, cx, cy, innerR * 1.6);
+      coreGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+      coreGrad.addColorStop(0.35, `rgba(${coreRgb}, 0.75)`);
+      coreGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
       ctx.beginPath();
-      ctx.arc(cx, cy, coreRadius * 1.35, 0, Math.PI * 2);
-      ctx.fillStyle = grad;
+      ctx.arc(cx, cy, innerR * 1.6, 0, Math.PI * 2);
+      ctx.fillStyle = coreGrad;
       ctx.fill();
 
-      ctx.beginPath();
-      ctx.arc(cx, cy, coreRadius * 0.72, 0, Math.PI * 2);
-      ctx.strokeStyle = mainColor;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // Center precision crosshair
-      ctx.beginPath();
-      ctx.moveTo(cx - 7, cy);
-      ctx.lineTo(cx + 7, cy);
-      ctx.moveTo(cx, cy - 7);
-      ctx.lineTo(cx, cy + 7);
-      ctx.strokeStyle = 'hsla(210, 20%, 96%, 0.75)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
+      ctx.restore();
       ctx.restore();
       requestAnimationFrame(renderFrame);
     }
@@ -661,7 +871,7 @@
     }
     state.debounceStartAt = performance.now();
     if (dom.debounceIndicator) {
-      dom.debounceIndicator.textContent = 'ESPERANDO PAUSA (1.7s)...';
+      dom.debounceIndicator.textContent = 'PAUSA 1.7s...';
     }
     state.silenceTimer = setTimeout(() => {
       flushAccumulatedTranscript();
@@ -710,7 +920,6 @@
 
     recognition.onresult = (event) => {
       if (state.isSpeaking) {
-        // Ignore self-echo while Ultrón is speaking
         return;
       }
 
@@ -752,7 +961,6 @@
     recognition.onend = () => {
       state.recognitionRunning = false;
 
-      // Auto-restart in handsfree mode when not speaking or processing, or during active PTT hold
       const shouldKeepListening =
         !state.isSpeaking &&
         !state.isProcessing &&
@@ -818,7 +1026,10 @@
     } else {
       safeStopRecognition();
       setUltronState('idle');
-      updateLiveTranscriptDisplay('Micrófono en pausa. Usa el teclado o reactiva Manos Libres.', true);
+      updateLiveTranscriptDisplay(
+        'Micrófono en pausa. Usa el teclado o reactiva Manos Libres.',
+        true
+      );
     }
   }
 
@@ -826,7 +1037,7 @@
     state.speechLang = langCode;
     dom.langEsBtn.classList.toggle('active', langCode === 'es-CO');
     dom.langEnBtn.classList.toggle('active', langCode === 'en-US');
-    dom.activeLangBadge.textContent = langCode;
+    dom.activeLangBadge.textContent = langCode.toUpperCase();
 
     if (recognition) {
       recognition.lang = langCode;
@@ -936,7 +1147,6 @@
       return;
     }
 
-    // Pause SpeechRecognition while Ultrón speaks to prevent echo feedback loop
     safeStopRecognition();
     state.isSpeaking = true;
     setUltronState('speaking');
@@ -973,7 +1183,6 @@
         }
       }
 
-      // Fallback to WebSpeech if /api/tts returned 204 or empty audio
       speakWithBrowserFallback(cleanText, lang);
     } catch (err) {
       if (err && err.name === 'AbortError') {
@@ -1023,7 +1232,7 @@
       const replyText = data.reply || 'Orden procesada correctamente.';
 
       appendChatMessage({
-        sender: 'ULTRÓN v4.0',
+        sender: 'ULTRÓN v5.0',
         text: replyText,
         lang: 'ES-CO',
         meta: `${elapsedMs} ms`,
@@ -1034,9 +1243,10 @@
       await speakResponse(replyText, 'es');
     } catch (err) {
       state.isProcessing = false;
-      const errMsg = 'Error de enlace con el núcleo local de Ultrón. Verifica que el servidor esté activo.';
+      const errMsg =
+        'Error de enlace con el núcleo local de Ultrón. Verifica que el servidor esté activo.';
       appendChatMessage({
-        sender: 'ULTRÓN v4.0',
+        sender: 'ULTRÓN v5.0',
         text: errMsg,
         lang: 'ES-CO',
         meta: 'ERROR',
@@ -1058,8 +1268,12 @@
     const mode =
       customMode || (dom.visionModeSelect ? dom.visionModeSelect.value : 'general');
 
+    if (dom.visionModeSelect && customMode) {
+      dom.visionModeSelect.value = customMode;
+    }
+
     dom.visionCaptureBtn.disabled = true;
-    dom.visionCaptureBtn.textContent = '⏳ CAPTURANDO Y ANALIZANDO ESCRITORIO...';
+    dom.visionCaptureBtn.innerHTML = `${SVG_ICONS.spinner}<span>CAPTURANDO Y ANALIZANDO ESCRITORIO...</span>`;
     dom.visionAnalysisOutput.textContent =
       'Capturando frame del escritorio y ejecutando inspección multimodal...';
     state.isProcessing = true;
@@ -1085,7 +1299,7 @@
       }
 
       const providerLabel = (data.provider_used || 'VLM').toUpperCase();
-      dom.visionMetaBadge.textContent = `${ String(data.mode || mode).toUpperCase() } · ${providerLabel}`;
+      dom.visionMetaBadge.textContent = `${String(data.mode || mode).toUpperCase()} · ${providerLabel}`;
       dom.visionLatencyTag.textContent = `${data.latency_ms || 0} ms`;
       dom.visionAnalysisOutput.textContent = data.analysis || 'Inspección completada.';
 
@@ -1105,8 +1319,103 @@
       setUltronState(state.voiceMode === 'handsfree' ? 'listening' : 'idle');
     } finally {
       dom.visionCaptureBtn.disabled = false;
-      dom.visionCaptureBtn.innerHTML = '<span>👁️ Capturar y Analizar Pantalla</span>';
+      dom.visionCaptureBtn.innerHTML = `${SVG_ICONS.eyeScan}<span>Capturar y Analizar Pantalla</span>`;
     }
+  }
+
+  // ==========================================================================
+  // 6. 21ST.DEV / RAYCAST COMMAND PALETTE MODAL (Ctrl + K)
+  // ==========================================================================
+  function renderCommandPaletteList() {
+    if (!dom.cmdPaletteList) return;
+    dom.cmdPaletteList.innerHTML = '';
+
+    if (state.filteredCommands.length === 0) {
+      const emptyEl = document.createElement('div');
+      emptyEl.className = 'empty-row mono-sub';
+      emptyEl.textContent = 'No se encontraron comandos que coincidan con tu búsqueda.';
+      dom.cmdPaletteList.appendChild(emptyEl);
+      return;
+    }
+
+    state.filteredCommands.forEach((item, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `cmd-palette-item ${idx === state.cmdPaletteSelectedIndex ? 'active' : ''}`;
+      btn.setAttribute('role', 'option');
+      btn.setAttribute('aria-selected', String(idx === state.cmdPaletteSelectedIndex));
+
+      btn.innerHTML = `
+        <div class="cmd-item-left">
+          <span class="cmd-item-icon">${item.icon}</span>
+          <div class="cmd-item-text">
+            <span class="cmd-item-title">${item.title}</span>
+            <span class="cmd-item-sub">${item.subtitle}</span>
+          </div>
+        </div>
+        <span class="cmd-item-category">${item.category}</span>
+      `;
+
+      btn.addEventListener('mouseenter', () => {
+        state.cmdPaletteSelectedIndex = idx;
+        updateCommandPaletteActiveHighlight();
+      });
+
+      btn.addEventListener('click', () => {
+        closeCommandPalette();
+        item.action();
+      });
+
+      dom.cmdPaletteList.appendChild(btn);
+    });
+  }
+
+  function updateCommandPaletteActiveHighlight() {
+    if (!dom.cmdPaletteList) return;
+    const items = dom.cmdPaletteList.querySelectorAll('.cmd-palette-item');
+    items.forEach((el, idx) => {
+      const isSelected = idx === state.cmdPaletteSelectedIndex;
+      el.classList.toggle('active', isSelected);
+      el.setAttribute('aria-selected', String(isSelected));
+      if (isSelected) {
+        el.scrollIntoView({ block: 'nearest' });
+      }
+    });
+  }
+
+  function openCommandPalette() {
+    if (!dom.cmdPaletteModal) return;
+    state.cmdPaletteOpen = true;
+    state.cmdPaletteSelectedIndex = 0;
+    state.filteredCommands = [...COMMAND_PALETTE_ITEMS];
+    dom.cmdPaletteModal.classList.remove('hidden');
+    if (dom.cmdPaletteInput) {
+      dom.cmdPaletteInput.value = '';
+      renderCommandPaletteList();
+      setTimeout(() => dom.cmdPaletteInput.focus(), 20);
+    }
+  }
+
+  function closeCommandPalette() {
+    if (!dom.cmdPaletteModal) return;
+    state.cmdPaletteOpen = false;
+    dom.cmdPaletteModal.classList.add('hidden');
+  }
+
+  function filterCommandPalette(query) {
+    const q = String(query || '').toLowerCase().trim();
+    if (!q) {
+      state.filteredCommands = [...COMMAND_PALETTE_ITEMS];
+    } else {
+      state.filteredCommands = COMMAND_PALETTE_ITEMS.filter(
+        (item) =>
+          item.title.toLowerCase().includes(q) ||
+          item.subtitle.toLowerCase().includes(q) ||
+          item.category.toLowerCase().includes(q)
+      );
+    }
+    state.cmdPaletteSelectedIndex = 0;
+    renderCommandPaletteList();
   }
 
   // ==========================================================================
@@ -1123,6 +1432,29 @@
         stopSpeakingBargeIn();
       }
     });
+
+    // Command Palette Triggers (Topbar + Dock + Modal Close)
+    if (dom.cmdPaletteTriggerBtn) {
+      dom.cmdPaletteTriggerBtn.addEventListener('click', openCommandPalette);
+    }
+    if (dom.dockCmdPaletteBtn) {
+      dom.dockCmdPaletteBtn.addEventListener('click', openCommandPalette);
+    }
+    if (dom.cmdPaletteCloseBtn) {
+      dom.cmdPaletteCloseBtn.addEventListener('click', closeCommandPalette);
+    }
+    if (dom.cmdPaletteModal) {
+      dom.cmdPaletteModal.addEventListener('click', (e) => {
+        if (e.target === dom.cmdPaletteModal) {
+          closeCommandPalette();
+        }
+      });
+    }
+    if (dom.cmdPaletteInput) {
+      dom.cmdPaletteInput.addEventListener('input', (e) => {
+        filterCommandPalette(e.target.value);
+      });
+    }
 
     // Manual Telemetry Refresh
     dom.refreshTelemetryBtn.addEventListener('click', () => {
@@ -1142,6 +1474,24 @@
     dom.flushTranscriptBtn.addEventListener('click', () => {
       flushAccumulatedTranscript();
     });
+
+    // 21st.dev Interactive Suggestion Chips
+    if (dom.suggestionChips) {
+      dom.suggestionChips.addEventListener('click', (e) => {
+        const chip = e.target.closest('.suggestion-chip');
+        if (!chip) return;
+        const suggestCmd = chip.getAttribute('data-suggest-cmd');
+        const suggestVision = chip.getAttribute('data-suggest-vision');
+        if (suggestVision) {
+          runVisionAnalysis(
+            '¿Qué ves en mi pantalla y qué recomendaciones técnicas tienes?',
+            suggestVision
+          );
+        } else if (suggestCmd) {
+          sendCommand(suggestCmd);
+        }
+      });
+    }
 
     // Reactor Click -> Barge-In if speaking, or toggle mic
     const handleReactorAction = () => {
@@ -1173,9 +1523,12 @@
       state.accumulatedTranscript = '';
       state.interimTranscript = '';
       dom.pttHoldBtn.classList.add('recording');
-      dom.pttHoldBtn.textContent = '🔴 GRABANDO... SUELTA PARA ENVIAR TU ORDEN COMPLETA';
+      dom.pttHoldBtn.innerHTML = `${SVG_ICONS.recordPulse}<span>GRABANDO... SUELTA PARA ENVIAR TU ORDEN COMPLETA</span>`;
       setUltronState('listening');
-      updateLiveTranscriptDisplay('Escuchando (mantén presionado todo el tiempo que necesites)...', false);
+      updateLiveTranscriptDisplay(
+        'Escuchando (mantén presionado todo el tiempo que necesites)...',
+        false
+      );
       safeStartRecognition();
     };
 
@@ -1184,8 +1537,7 @@
       if (!state.pttActive) return;
       state.pttActive = false;
       dom.pttHoldBtn.classList.remove('recording');
-      dom.pttHoldBtn.textContent =
-        '🎙️ MANTÉN PRESIONADO AQUÍ O [ESPACIO] PARA HABLAR SIN LÍMITE DE TIEMPO';
+      dom.pttHoldBtn.innerHTML = `${SVG_ICONS.mic}<span>MANTÉN PRESIONADO AQUÍ O [ESPACIO] PARA HABLAR SIN LÍMITE DE TIEMPO</span>`;
       safeStopRecognition();
       setTimeout(() => {
         flushAccumulatedTranscript();
@@ -1199,8 +1551,56 @@
     dom.pttHoldBtn.addEventListener('touchstart', startPttHold, { passive: false });
     dom.pttHoldBtn.addEventListener('touchend', endPttHold, { passive: false });
 
-    // Global Keyboard Shortcuts: Escape (Barge-In / Lightbox) & Spacebar (Push-to-Talk)
+    // Global Keyboard Shortcuts: Ctrl+K (Command Palette), Escape (Modals / Barge-In) & Spacebar (PTT)
     window.addEventListener('keydown', (e) => {
+      // Ctrl+K or Cmd+K toggles Command Palette
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (state.cmdPaletteOpen) {
+          closeCommandPalette();
+        } else {
+          openCommandPalette();
+        }
+        return;
+      }
+
+      // Keyboard navigation when Command Palette is open
+      if (state.cmdPaletteOpen) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeCommandPalette();
+          return;
+        }
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (state.filteredCommands.length > 0) {
+            state.cmdPaletteSelectedIndex =
+              (state.cmdPaletteSelectedIndex + 1) % state.filteredCommands.length;
+            updateCommandPaletteActiveHighlight();
+          }
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (state.filteredCommands.length > 0) {
+            state.cmdPaletteSelectedIndex =
+              (state.cmdPaletteSelectedIndex - 1 + state.filteredCommands.length) %
+              state.filteredCommands.length;
+            updateCommandPaletteActiveHighlight();
+          }
+          return;
+        }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const chosen = state.filteredCommands[state.cmdPaletteSelectedIndex];
+          if (chosen) {
+            closeCommandPalette();
+            chosen.action();
+          }
+          return;
+        }
+      }
+
       if (e.key === 'Escape') {
         if (!dom.lightboxModal.classList.contains('hidden')) {
           dom.lightboxModal.classList.add('hidden');
@@ -1276,7 +1676,7 @@
   }
 
   // ==========================================================================
-  // BOOTSTRAP STARK HUD v4.0
+  // BOOTSTRAP STARK HUD v5.0 SPATIAL OS
   // ==========================================================================
   function initHud() {
     bindEvents();
@@ -1285,8 +1685,8 @@
 
     // Initial tactical greeting in console
     appendChatMessage({
-      sender: 'ULTRÓN v4.0 // STARK OS',
-      text: 'Sistemas tácticos en línea, Ingeniero Juan Diego Cerón Duque. Telemetría de hardware activa, visión multimodal lista y reconocimiento de voz continuo con protección anticorte de frase (1700ms). ¿Cuál es tu orden?',
+      sender: 'ULTRÓN v5.0 // SPATIAL OS',
+      text: 'Núcleo espacial v5.0 en línea, Ingeniero Juan Diego Cerón Duque. Orbe volumétrico 60 FPS activo, telemetría de hardware en tiempo real, estudio de visión multimodal VLM y escucha continua con protección anticorte (1700ms). Usa tu voz, los chips rápidos o presiona Ctrl+K.',
       lang: 'ES-CO',
       meta: 'BOOT OK',
       isUser: false,

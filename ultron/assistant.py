@@ -226,6 +226,17 @@ class UltronAssistant:
         if any(w in query for w in ("qué fecha", "que fecha", "qué día es hoy", "que dia es hoy", "what date", "today's date", "what day is today")):
             return self.skills.tell_date(lang=out_lang)
 
+        # 7.5 Google Calendar ("¿tienes acceso a mi google calendar?", "revisa mi calendario", "mi agenda")
+        if any(w in query for w in ("google calendar", "mi calendario", "mi agenda")) and not query.startswith(("abre ", "abrir ", "open ")):
+            self.skills.open_any_target("google calendar", lang=out_lang)
+            msg = (
+                f"Te acabo de abrir Google Calendar en tu navegador, {self.config.user_name}. "
+                "Una vez esté en pantalla, dime 'Ultrón, mira mi pantalla' para leer tu agenda con Visión Multimodal, "
+                "o dime 'anota ...' para guardar un recordatorio local."
+            )
+            self.tts.speak(msg, lang=out_lang)
+            return msg
+
         # 8. Búsquedas o reproducción en Spotify ("reproduce a ryan castro en spotify", "pon ... en spotify", "busca en spotify...")
         if "spotify" in query and any(
             v in query for v in ("reproduce", "reproducir", "pon", "poner", "busca", "buscar", "escuchar", "play", "search")
