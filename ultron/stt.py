@@ -106,25 +106,27 @@ class UltronSTT:
         if self._whisper_model is not None:
             result = self._transcribe_with_whisper(audio, target_lang)
             if result:
+                print(f"🗣️ [{self.config.user_name} | {result.language.upper()}]: {result.text}")
                 return result
 
         # 2. Fallback a Google Web Speech API respetando prioridad de idiomas de Juan Diego (ES -> EN -> FR)
-        return self._transcribe_with_google(recognizer, audio, target_lang)
+        result = self._transcribe_with_google(recognizer, audio, target_lang)
+        if result:
+            print(f"🗣️ [{self.config.user_name} | {result.language.upper()}]: {result.text}")
+        return result
 
     def _transcribe_with_whisper(
         self, audio: object, default_lang: str
     ) -> Optional[TranscriptionResult]:
         try:
             wav_bytes = audio.get_wav_data()  # type: ignore[attr-defined]
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as tmp_wav:
-                tmp_wav.write(wav_bytes)
-                tmp_wav.flush()
-                segments, info = self._whisper_model.transcribe(  # type: ignore[union-attr]
-                    tmp_wav.name,
-                    beam_size=3,
-                    vad_filter=True,
-                )
-                text = " ".join(seg.text.strip() for seg in segments).strip()
+            wav_stream = io.BytesIO(wav_bytes)
+            segments, info = self._whisper_model.transcribe(  # type: ignore[union-attr]
+                wav_stream,
+                beam_size=3,
+                vad_filter=True,
+            )
+            text = " ".join(seg.text.strip() for seg in segments).strip()
 
             if not text:
                 return None

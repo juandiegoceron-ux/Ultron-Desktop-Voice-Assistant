@@ -532,6 +532,14 @@ class UltronTelemetry:
                         info = proc.info if hasattr(proc, "info") and isinstance(proc.info, dict) else {}
                         pid = int(info.get("pid") or getattr(proc, "pid", 0))
                         name = str(info.get("name") or "unknown")
+                        if name.strip().lower() in {
+                            "system idle process",
+                            "memcompression",
+                            "memory compression",
+                            "system",
+                            "registry",
+                        }:
+                            continue
                         cpu_pct = round(float(info.get("cpu_percent") or 0.0), 1)
                         mem_pct = round(float(info.get("memory_percent") or 0.0), 1)
                         mem_info = info.get("memory_info")
