@@ -3,7 +3,7 @@
 # Ingenieria Biomedica - Ing. Juan Diego Ceron Duque
 # ==============================================================================
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 # Determinar la raiz del proyecto de forma dinamica
 $scriptDir = $PSScriptRoot
@@ -12,11 +12,34 @@ if (-not $scriptDir) {
 }
 
 $projectRoot = (Resolve-Path (Join-Path $scriptDir "..")).Path
-$desktopPath = [Environment]::GetFolderPath([Environment+SpecialFolder]::Desktop)
 
-if (-not (Test-Path $desktopPath)) {
-    # Fallback por si la variable de entorno especial no resuelve
-    $desktopPath = [System.IO.Path]::Combine($env:USERPROFILE, "Desktop")
+# 1. Obtener la ruta del Escritorio de Windows (compatible con OneDrive y todas las versiones de PS)
+$desktopPath = $null
+try {
+    $desktopPath = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Desktop)
+} catch {
+    $desktopPath = $null
+}
+
+if (-not $desktopPath -or -not (Test-Path $desktopPath)) {
+    try {
+        $desktopPath = [System.Environment]::GetFolderPath("Desktop")
+    } catch {
+        $desktopPath = $null
+    }
+}
+
+if (-not $desktopPath -or -not (Test-Path $desktopPath)) {
+    try {
+        $wshTemp = New-Object -ComObject WScript.Shell
+        $desktopPath = $wshTemp.SpecialFolders.Item("Desktop")
+    } catch {
+        $desktopPath = $null
+    }
+}
+
+if (-not $desktopPath -or -not (Test-Path $desktopPath)) {
+    $desktopPath = Join-Path $env:USERPROFILE "Desktop"
 }
 
 $iconPath = Join-Path $projectRoot "ultron.ico"
@@ -34,31 +57,39 @@ Write-Host "[*] Raiz del proyecto: $projectRoot" -ForegroundColor DarkGray
 Write-Host "[*] Carpeta Escritorio: $desktopPath" -ForegroundColor DarkGray
 
 # 1. Crear Acceso Directo Principal: Ultrón AI (Modo App Stark HUD)
-$mainShortcutPath = Join-Path $desktopPath "Ultrón AI.lnk"
-$mainShortcut = $wshShell.CreateShortcut($mainShortcutPath)
-$mainShortcut.TargetPath = $wscriptExe
-$mainShortcut.Arguments = "`"$vbsPath`""
-$mainShortcut.WorkingDirectory = $projectRoot
-$mainShortcut.Description = "Ultrón AI Voice OS & Asistente Jarvis - Juan Diego Ceron"
-if (Test-Path $iconPath) {
-    $mainShortcut.IconLocation = "$iconPath, 0"
+try {
+    $mainShortcutPath = Join-Path $desktopPath "Ultrón AI.lnk"
+    $mainShortcut = $wshShell.CreateShortcut($mainShortcutPath)
+    $mainShortcut.TargetPath = $wscriptExe
+    $mainShortcut.Arguments = "`"$vbsPath`""
+    $mainShortcut.WorkingDirectory = $projectRoot
+    $mainShortcut.Description = "Ultrón AI Voice OS & Asistente Jarvis - Juan Diego Ceron"
+    if (Test-Path $iconPath) {
+        $mainShortcut.IconLocation = "$iconPath,0"
+    }
+    $mainShortcut.Hotkey = "Ctrl+Alt+U"
+    $mainShortcut.Save()
+    Write-Host "[OK] Creado: Ultrón AI.lnk (Modo App Silencioso)" -ForegroundColor Green
+    Write-Host "     -> Atajo global asignado: Ctrl + Alt + U" -ForegroundColor Yellow
+} catch {
+    Write-Host "[!] Error creando acceso directo silencioso: $_" -ForegroundColor Red
 }
-$mainShortcut.Hotkey = "Ctrl+Alt+U"
-$mainShortcut.Save()
-Write-Host "[OK] Creado: Ultrón AI.lnk (Modo App Nativa)" -ForegroundColor Green
-Write-Host "     -> Atajo global asignado: Ctrl + Alt + U" -ForegroundColor Yellow
 
 # 2. Crear Acceso Directo de Depuracion: Ultrón AI (Consola)
-$debugShortcutPath = Join-Path $desktopPath "Ultrón AI (Consola).lnk"
-$debugShortcut = $wshShell.CreateShortcut($debugShortcutPath)
-$debugShortcut.TargetPath = $batPath
-$debugShortcut.WorkingDirectory = $projectRoot
-$debugShortcut.Description = "Ultrón AI Voice OS (Modo Consola con Logs)"
-if (Test-Path $iconPath) {
-    $debugShortcut.IconLocation = "$iconPath, 0"
+try {
+    $debugShortcutPath = Join-Path $desktopPath "Ultrón AI (Consola).lnk"
+    $debugShortcut = $wshShell.CreateShortcut($debugShortcutPath)
+    $debugShortcut.TargetPath = $batPath
+    $debugShortcut.WorkingDirectory = $projectRoot
+    $debugShortcut.Description = "Ultrón AI Voice OS (Modo Consola con Logs)"
+    if (Test-Path $iconPath) {
+        $debugShortcut.IconLocation = "$iconPath,0"
+    }
+    $debugShortcut.Save()
+    Write-Host "[OK] Creado: Ultrón AI (Consola).lnk (Modo con Terminal)" -ForegroundColor Green
+} catch {
+    Write-Host "[!] Error creando acceso directo de consola: $_" -ForegroundColor Red
 }
-$debugShortcut.Save()
-Write-Host "[OK] Creado: Ultrón AI (Consola).lnk (Modo con Terminal)" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "==================================================================" -ForegroundColor Cyan

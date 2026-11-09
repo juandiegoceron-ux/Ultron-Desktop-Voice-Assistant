@@ -1,4 +1,5 @@
 @echo off
+setlocal
 chcp 65001 >nul
 title ULTRÓN AI Assistant — Stark Voice OS
 cd /d "%~dp0"
@@ -9,54 +10,66 @@ echo           Ing. Biomedico: Juan Diego Ceron Duque
 echo ====================================================================
 echo.
 
-:: Detectar ejecutable de Python (entorno virtual o global)
-set "PYTHON_EXE="
-
+:: 1. Verificar si existe entorno virtual local
 if exist "%~dp0.venv\Scripts\python.exe" (
-    set "PYTHON_EXE=%~dp0.venv\Scripts\python.exe"
-    echo [*] Utilizando entorno virtual (.venv)
-) else if exist "%~dp0venv\Scripts\python.exe" (
-    set "PYTHON_EXE=%~dp0venv\Scripts\python.exe"
-    echo [*] Utilizando entorno virtual (venv)
-) else (
-    where python >nul 2>nul
-    if %errorlevel% equ 0 (
-        set "PYTHON_EXE=python"
-        echo [*] Utilizando Python global del sistema
-    ) else (
-        where py >nul 2>nul
-        if %errorlevel% equ 0 (
-            set "PYTHON_EXE=py -3"
-            echo [*] Utilizando lanzador py de Windows
-        )
-    )
+    echo [*] Detectado entorno virtual (.venv)
+    set "RUN_CMD="%~dp0.venv\Scripts\python.exe""
+    goto :run
+)
+if exist "%~dp0venv\Scripts\python.exe" (
+    echo [*] Detectado entorno virtual (venv)
+    set "RUN_CMD="%~dp0venv\Scripts\python.exe""
+    goto :run
 )
 
-if "%PYTHON_EXE%"=="" (
-    echo.
-    echo [ERROR] No se encontro Python en tu sistema ni en .venv/venv.
-    echo Por favor instala Python 3.10+ desde https://www.python.org/downloads/
-    echo o desde la Microsoft Store, marcando 'Add python.exe to PATH'.
-    echo.
-    pause
-    exit /b 1
+:: 2. Verificar lanzador py de Windows
+py -3 --version >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [*] Detectado lanzador Python (py -3)
+    set "RUN_CMD=py -3"
+    goto :run
 )
 
-:: Si se pasaron parametros extras, usarlos; de lo contrario arrancar con --hud por defecto
+:: 3. Verificar python en PATH
+python --version >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [*] Detectado Python en PATH
+    set "RUN_CMD=python"
+    goto :run
+)
+
+:: Si llego aqui, no se encontro Python
+echo.
+echo ====================================================================
+echo [ERROR] No se encontro Python en tu sistema ni en .venv/venv.
+echo.
+echo Para solucionarlo:
+echo  1. Instala Python 3.10 o superior desde https://www.python.org/downloads/
+echo  2. Asegurate de marcar la casilla: 'Add python.exe to PATH'
+echo ====================================================================
+echo.
+pause
+exit /b 1
+
+:run
 if "%~1"=="" (
     set "ARGS=--hud"
 ) else (
     set "ARGS=%*"
 )
 
-echo [*] Ejecutando: %PYTHON_EXE% main.py %ARGS%
+echo [*] Ejecutando: %RUN_CMD% main.py %ARGS%
 echo.
-%PYTHON_EXE% main.py %ARGS%
+
+%RUN_CMD% main.py %ARGS%
 
 if %errorlevel% neq 0 (
     echo.
+    echo ====================================================================
     echo [!] Ultrón finalizo con codigo de salida %errorlevel%.
-    echo Si falta alguna dependencia, ejecuta: pip install -r requirements.txt
+    echo Si falta alguna libreria, ejecuta en tu terminal:
+    echo     pip install -r requirements.txt
+    echo ====================================================================
     echo.
     pause
 )
