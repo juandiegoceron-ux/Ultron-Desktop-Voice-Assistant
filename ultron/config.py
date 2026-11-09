@@ -88,10 +88,13 @@ class UltronConfig:
     personal_shortcuts: Dict[str, str] = field(
         default_factory=lambda: {
             "nutricoach": "https://nutricoach-eight.vercel.app/",
+            "nutri coach": "https://nutricoach-eight.vercel.app/",
             "invpro": "https://www.useinvpro.com/",
+            "inv pro": "https://www.useinvpro.com/",
             "inventario": "https://www.useinvpro.com/",
             "portafolio": "https://portfolio-steel-three-k7q0hqmuhs.vercel.app/",
             "portfolio": "https://portfolio-steel-three-k7q0hqmuhs.vercel.app/",
+            "bola viga": "https://github.com/juandiegoceron-ux/bola-viga-pid",
             "github": "https://github.com/juandiegoceron-ux",
             "linkedin": "https://www.linkedin.com/in/juan-diego-ceron-duque-1208833a9/",
             "youtube": "https://www.youtube.com",

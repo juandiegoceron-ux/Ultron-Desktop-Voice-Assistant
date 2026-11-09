@@ -108,6 +108,18 @@ class TestUltronAssistant(unittest.TestCase):
         resp = self.assistant.process_command("ultron")
         self.assertIn("Te escucho fuerte y claro", resp)
 
+    def test_compound_youtube_search(self) -> None:
+        resp = self.assistant.process_command("abre youtube y busca música")
+        self.assertIn("Buscando 'música' en YouTube", resp)
+
+    def test_analiza_mi_sistema_routes_to_telemetry(self) -> None:
+        resp = self.assistant.process_command("ultron analiza mi sistema")
+        self.assertIn("Diagnóstico de sistemas completado, Juan Diego", resp)
+
+    def test_spaced_nutri_coach_pro_shortcut(self) -> None:
+        resp = self.assistant.process_command("ultrón abrir nutri coach pro")
+        self.assertIn("nutri", resp.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

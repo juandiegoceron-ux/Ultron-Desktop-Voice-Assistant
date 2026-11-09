@@ -126,12 +126,16 @@ class UltronBrain:
 
     def _ask_free_cloud_llm(self, prompt: str, system_prompt: str) -> Optional[str]:
         """
-        Motor LLM gratuito sin configuración (Pollinations OpenAI-compatible API)
+        Motor LLM gratuito sin configuración (Pollinations OpenAI-compatible API + GET backup)
         para garantizar respuestas inteligentes incluso sin GEMINI_API_KEY.
         """
+        import random
+        import urllib.parse
+
         try:
             payload = {
                 "model": "openai",
+                "seed": random.randint(1, 999999),
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
@@ -151,5 +155,16 @@ class UltronBrain:
                     if content:
                         return content
         except Exception as exc:
-            logger.debug("Fallo en motor cloud gratuito: %s", exc)
+            logger.debug("Fallo en endpoint primario cloud gratuito: %s", exc)
+
+        # Respaldo secundario GET directo si el endpoint POST tuvo rate-limit momentáneo
+        try:
+            encoded_q = urllib.parse.quote(prompt)
+            encoded_sys = urllib.parse.quote(system_prompt)
+            url = f"https://text.pollinations.ai/{encoded_q}?model=openai&system={encoded_sys}"
+            resp2 = requests.get(url, timeout=12)
+            if resp2.status_code == 200 and resp2.text.strip():
+                return resp2.text.strip()
+        except Exception as exc:
+            logger.debug("Fallo en endpoint secundario cloud gratuito: %s", exc)
         return None

@@ -1,10 +1,11 @@
 """
-Motor de Reconocimiento de Voz (Speech-to-Text) Híbrido Optimizado:
-1. Calibración única de ruido ambiental al inicio (evita cortar las primeras palabras al hablar).
-2. Reconocimiento de alta precisión bilingüe (Español Colombia `es-CO` e Inglés `en-US`) vía Google Speech API
-   (0 MB de consumo de RAM extra, ideal para laptops con alta carga de memoria).
-3. Fallback 100% Offline con `faster-whisper` enriquecido con `initial_prompt` de vocabulario de Ultrón.
-4. Modo interactivo por teclado (`text_mode`) para desarrollo o entornos sin micrófono.
+Motor de Reconocimiento de Voz (Speech-to-Text) Híbrido Optimizado (v3.2):
+1. Ventana de pausa extendida (`pause_threshold = 1.6s` y `phrase_time_limit = 20s`) para capturar
+   oraciones largas completas sin cortar al usuario cuando toma aire o hace pausas naturales.
+2. `dynamic_energy_threshold = False` con umbral estabilizado para que el micrófono no pierda sensibilidad
+   a mitad de una frase larga.
+3. Reconocimiento bilingüe enfocado en Español (`es-CO`) e Inglés (`en-US`) sin falsos positivos en francés.
+4. Fallback 100% Offline con `faster-whisper` (16kHz).
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from __future__ import annotations
 import io
 import logging
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 
 from ultron.config import UltronConfig
 from ultron.strings import detect_language, tr
@@ -20,9 +21,9 @@ from ultron.strings import detect_language, tr
 logger = logging.getLogger("ultron.stt")
 
 ULTRON_WHISPER_PROMPT = (
-    "Ultrón, Hey Ultrón, Oye Ultrón, Juan Diego, NutriCoach, invpro, portafolio, GitHub, "
-    "¿qué hora es?, ¿qué fecha es hoy?, diagnóstico del sistema, telemetría, ¿qué consume mi RAM?, "
-    "mira mi pantalla, analiza mi pantalla, cuéntame un chiste, guarda una nota, lee mis notas, "
+    "Ultrón, Hey Ultrón, Oye Ultrón, Juan Diego, NutriCoach Pro, invpro, portafolio, GitHub, "
+    "¿qué hora es?, ¿qué fecha es hoy?, analiza mi sistema, diagnóstico del sistema, telemetría, "
+    "¿qué consume mi RAM?, mira mi pantalla, analiza mi pantalla, abre YouTube y busca música, "
     "What time is it?, How is my PC running?, What is eating my RAM?, Look at my screen, Open my portfolio."
 )
 
@@ -37,7 +38,7 @@ class TranscriptionResult:
 
 
 class UltronSTT:
-    """Gestor de entrada de voz y texto de baja latencia para Ultrón."""
+    """Gestor de entrada de voz y texto optimizado para frases largas y naturales."""
 
     def __init__(self, config: UltronConfig, text_mode: bool = False) -> None:
         self.config = config
@@ -52,9 +53,13 @@ class UltronSTT:
             import speech_recognition as sr
 
             r = sr.Recognizer()
-            r.pause_threshold = 0.8
-            r.non_speaking_duration = 0.4
-            r.dynamic_energy_threshold = True
+            # Pausa generosa (1.6s) para que Juan Diego pueda decir frases largas con pausas naturales sin ser cortado
+            r.pause_threshold = 1.6
+            r.non_speaking_duration = 0.6
+            r.phrase_threshold = 0.25
+            # Desactivar ajuste dinámico agresivo que sube el umbral a mitad de la frase y corta el final
+            r.dynamic_energy_threshold = False
+            r.energy_threshold = 250
             self._recognizer = r
         return self._recognizer
 
@@ -81,7 +86,7 @@ class UltronSTT:
 
     def listen(self, lang_hint: Optional[str] = None) -> Optional[TranscriptionResult]:
         """
-        Escucha una orden del usuario por micrófono o consola y devuelve el texto y el idioma detectado.
+        Escucha una orden completa del usuario por micrófono o consola.
         """
         target_lang = lang_hint or self.config.default_lang
 
@@ -109,9 +114,11 @@ class UltronSTT:
                 if not self._calibrated:
                     print("🎛️ Calibrando micrófono para el ruido ambiente (1 segundo)...")
                     recognizer.adjust_for_ambient_noise(source, duration=0.8)  # type: ignore[attr-defined]
+                    # Limitar energy_threshold entre 120 y 380 para que no ignore finales de frases largas
+                    recognizer.energy_threshold = max(120, min(recognizer.energy_threshold, 380))  # type: ignore[attr-defined]
                     self._calibrated = True
-                print(f"🎙️ {tr(target_lang, 'listening')} (Habla ahora)")
-                audio = recognizer.listen(source, timeout=6, phrase_time_limit=10)  # type: ignore[attr-defined]
+                print(f"🎙️ {tr(target_lang, 'listening')} (Habla con naturalidad)")
+                audio = recognizer.listen(source, timeout=7, phrase_time_limit=22)  # type: ignore[attr-defined]
         except sr.WaitTimeoutError:
             return None
         except OSError as exc:
@@ -121,17 +128,16 @@ class UltronSTT:
 
         print(f"⚙️ {tr(target_lang, 'recognizing')}")
 
-        # Modo 1 (Híbrido inteligente): Reconocimiento de alta precisión (es-CO / en-US) sin consumir RAM
+        # Modo 1: Reconocimiento de alta precisión (es-CO / en-US) para frases completas
         if self.config.stt_engine != "whisper_offline":
             result, is_offline = self._transcribe_with_google(recognizer, audio, target_lang)
             if result:
                 print(f"🗣️ [{self.config.user_name} | {result.language.upper()}]: {result.text}")
                 return result
             if not is_offline:
-                # Hubo silencio o ruido ambiente, pero sí hay conexión: volver a escuchar sin cargar Whisper
                 return None
 
-        # Modo 2 (Offline faster-whisper a 16kHz cuando no hay internet o se forzó whisper_offline)
+        # Modo 2: Offline faster-whisper a 16kHz cuando no hay internet
         if not self._whisper_attempted:
             self._whisper_attempted = True
             self._init_whisper()
@@ -148,7 +154,6 @@ class UltronSTT:
         self, audio: object, default_lang: str
     ) -> Optional[TranscriptionResult]:
         try:
-            # Convertir a 16kHz mono para que faster-whisper no distorsione frecuencias de micrófonos de 48kHz
             wav_bytes = audio.get_wav_data(convert_rate=16000, convert_width=2)  # type: ignore[attr-defined]
             wav_stream = io.BytesIO(wav_bytes)
             segments, info = self._whisper_model.transcribe(  # type: ignore[union-attr]
@@ -166,7 +171,6 @@ class UltronSTT:
             ]
             text = " ".join(valid_texts).strip()
 
-            # Filtrar alucinaciones típicas de Whisper ante el silencio
             hallucinations = {
                 "we don't know.",
                 "we don't know",
@@ -180,7 +184,7 @@ class UltronSTT:
                 return None
 
             lang_code = getattr(info, "language", default_lang) or default_lang
-            if lang_code not in ("es", "en", "fr"):
+            if lang_code not in ("es", "en"):
                 lang_code = detect_language(text, default_lang=default_lang)
 
             return TranscriptionResult(
@@ -194,24 +198,24 @@ class UltronSTT:
 
     def _transcribe_with_google(
         self, recognizer: object, audio: object, default_lang: str
-    ) -> tuple[Optional[TranscriptionResult], bool]:
-        """Retorna `(TranscriptionResult | None, is_offline: bool)`."""
+    ) -> Tuple[Optional[TranscriptionResult], bool]:
+        """
+        Transcribe probando Español (Colombia) e Inglés (US).
+        Omite francés en escucha automática para evitar falsos positivos con ruido de fondo ('contrôle').
+        """
         import speech_recognition as sr
 
         lang_BCP47 = {
             "es": "es-CO",
             "en": "en-US",
-            "fr": "fr-FR",
         }
-        ordered_langs = [default_lang] + [
-            code for code in ("es", "en", "fr") if code != default_lang
-        ]
+        ordered_langs = ["es", "en"] if default_lang != "en" else ["en", "es"]
 
         for code in ordered_langs:
-            bcp = lang_BCP47.get(code, "es-CO")
+            bcp = lang_BCP47[code]
             try:
                 query = recognizer.recognize_google(audio, language=bcp)  # type: ignore[attr-defined]
-                if query:
+                if query and len(query.strip()) >= 2:
                     detected = detect_language(query, default_lang=code)
                     return (
                         TranscriptionResult(

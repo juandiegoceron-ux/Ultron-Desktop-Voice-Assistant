@@ -150,17 +150,29 @@ class UltronAssistant:
             "diagnóstico del sistema",
             "diagnostico del sistema",
             "diagnóstico",
+            "diagnostico",
+            "analiza mi sistema",
+            "analizar mi sistema",
+            "analiza el sistema",
+            "analiza mi pc",
+            "analiza mi computador",
+            "revisa mi sistema",
+            "revisa mi pc",
             "telemetría",
             "telemetria",
             "cómo está mi pc",
             "como esta mi pc",
             "cómo va mi pc",
+            "rendimiento del sistema",
             "uso de cpu",
             "uso de ram",
             "cuánta ram",
             "cuanta ram",
             "estado de la batería",
             "how is my pc running",
+            "analyze my system",
+            "analyze my pc",
+            "check my system",
             "system status",
             "system health",
             "system diagnostics",
@@ -193,22 +205,29 @@ class UltronAssistant:
         if any(w in query for w in ("qué fecha", "que fecha", "qué día es hoy", "que dia es hoy", "what date", "today's date", "what day is today")):
             return self.skills.tell_date(lang=out_lang)
 
-        # 8. Búsquedas directas en YouTube y Google
-        yt_match = re.match(
-            r"^(?:busca\s+en\s+youtube|buscar\s+en\s+youtube|pon\s+en\s+youtube|reproduce\s+en\s+youtube|search\s+on\s+youtube|play\s+on\s+youtube)\s+(.+)$",
-            query,
-        )
-        if yt_match:
-            return self.skills.search_youtube(yt_match.group(1), lang=out_lang)
+        # 8. Búsquedas directas o compuestas en YouTube ("abre youtube y busca música", "busca en youtube...", "pon en youtube...")
+        if "youtube" in query:
+            yt_compound = re.search(
+                r"(?:busca|buscar|pon|poner|reproduce|reproducir|escuchar|search|play|for)\s+(?:en\s+youtube\s+)?(.+)$",
+                query,
+            )
+            if yt_compound:
+                term = yt_compound.group(1).replace("en youtube", "").strip()
+                if term and term != "youtube":
+                    return self.skills.search_youtube(term, lang=out_lang)
 
-        google_match = re.match(
-            r"^(?:busca\s+en\s+google|buscar\s+en\s+google|googlea|search\s+on\s+google|google)\s+(.+)$",
-            query,
-        )
-        if google_match:
-            return self.skills.search_google(google_match.group(1), lang=out_lang)
+        # 9. Búsquedas directas o compuestas en Google ("abre google y busca...", "busca en google...")
+        if "google" in query:
+            gg_compound = re.search(
+                r"(?:busca|buscar|investiga|investigar|googlea|search|for)\s+(?:en\s+google\s+)?(.+)$",
+                query,
+            )
+            if gg_compound:
+                term = gg_compound.group(1).replace("en google", "").strip()
+                if term and term != "google":
+                    return self.skills.search_google(term, lang=out_lang)
 
-        # 9. Lanzador Universal: "abre <app/sitio/proyecto>" o "open <app/sitio/proyecto>"
+        # 10. Lanzador Universal: "abre <app/sitio/proyecto>" o "open <app/sitio/proyecto>"
         open_match = re.match(
             r"^(?:abre|abrir|ábreme|abreme|ejecuta|lanza|open|launch|start|ouvre)\s+(?:el\s+|la\s+|mi\s+|my\s+|the\s+)?(.+)$",
             query,
