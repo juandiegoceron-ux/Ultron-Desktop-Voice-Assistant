@@ -456,15 +456,55 @@ class FileOrganizerEngine:
     @staticmethod
     def resolve_target_directory(query_or_path: str) -> Path:
         """
-        Resuelve nombres naturales ('descargas', 'escritorio', 'documentos') o rutas explícitas
-        hacia la carpeta real del usuario en Windows 11 / Linux / macOS.
+        Resuelve rutas explícitas (en comillas, con letra de unidad o tras 'carpeta:') o nombres naturales
+        ('descargas', 'escritorio', 'documentos', 'scans', 'imágenes', etc.) hacia la carpeta
+        real en Windows 11 / Linux / macOS.
         """
-        q = query_or_path.lower().strip()
+        raw = query_or_path.strip()
         home = Path.home()
 
-        if any(w in q for w in ("descarga", "download")):
-            return home / "Downloads"
+        # 1. PASO PRIORITARIO: Buscar si el usuario pasó una ruta explícita entre comillas
+        # Ej: Organiza esta carpeta: "C:\Users\ASUS\OneDrive - Universidad Autonoma de Occidente\Scans\Documentos"
+        quote_match = re.search(r'["\']([^"\']+)["\']', raw)
+        if quote_match:
+            cand_str = quote_match.group(1).strip()
+            cand_path = Path(os.path.expanduser(cand_str))
+            if cand_path.exists() and cand_path.is_dir():
+                return cand_path
+            # Si parece una ruta absoluta de Windows/Unix, retornarla directamente para que organize_directory reporte el estado
+            if any(cand_str.startswith(c) for c in ("/", "~", "\\")) or re.match(r"^[a-zA-Z]:", cand_str):
+                return cand_path
 
+        # 2. PASO PRIORITARIO: Buscar rutas explícitas con letra de unidad (C:\...), barra (/...) o tilde (~/...)
+        path_match = re.search(
+            r'([a-zA-Z]:[\\/][^\n\r"\'<>|?*]+|/[^\n\r"\'<>|?*]+|~[\\/][^\n\r"\'<>|?*]+)',
+            raw,
+        )
+        if path_match:
+            cand_str = path_match.group(1).strip().rstrip(".,;:!? ")
+            cand_path = Path(os.path.expanduser(cand_str))
+            if cand_path.exists() and cand_path.is_dir():
+                return cand_path
+            if any(cand_str.startswith(c) for c in ("/", "~", "\\")) or re.match(r"^[a-zA-Z]:", cand_str):
+                return cand_path
+
+        # 3. PASO PRIORITARIO: Si después de "carpeta:", "directorio:" o "ruta:" viene un path o nombre
+        colon_match = re.search(r'(?:carpeta|directorio|ruta)\s*[:]\s*(.+)$', raw, re.IGNORECASE)
+        if colon_match:
+            cand_str = colon_match.group(1).strip().strip('"\'.,;: ')
+            cand_path = Path(os.path.expanduser(cand_str))
+            if cand_path.exists() and cand_path.is_dir():
+                return cand_path
+
+        # 4. PASO DIRECTO: Si el argumento completo es una ruta válida en disco
+        expanded = os.path.expanduser(raw.strip('"\':., '))
+        candidate_path = Path(expanded)
+        if candidate_path.exists() and candidate_path.is_dir():
+            return candidate_path
+
+        q = raw.lower().strip()
+
+        # 5. PASO CARPETAS DE USUARIO: Escritorio / Desktop
         if any(w in q for w in ("escritorio", "desktop")):
             candidates: List[Path] = []
             if sys.platform == "win32":
@@ -503,7 +543,7 @@ class FileOrganizerEngine:
                     has_loose_files = any(
                         not item.is_dir()
                         and not item.name.startswith(".")
-                        and item.suffix.lower() not in (".lnk", ".url", ".ini", ".crdownload", ".part", ".tmp")
+                        and item.suffix.lower() not in (".lnk", ".url", ".ini", ".crdownload", ".part", ".tmp", ".sys", ".dll")
                         for item in cand.iterdir()
                     )
                     if has_loose_files:
@@ -513,7 +553,8 @@ class FileOrganizerEngine:
 
             return candidates[0] if candidates else (home / "Desktop")
 
-        if any(w in q for w in ("documento", "document")):
+        # 6. PASO CARPETAS DE USUARIO: Documentos / Documents
+        if any(w in q for w in ("documento", "document", "docs")):
             candidates = []
             if sys.platform == "win32":
                 try:
@@ -553,15 +594,45 @@ class FileOrganizerEngine:
 
             return candidates[0] if candidates else (home / "Documents")
 
-        # Si el usuario pasó una ruta con ~ o ruta directa
-        expanded = os.path.expanduser(query_or_path.strip())
-        candidate_path = Path(expanded)
-        if candidate_path.exists() and candidate_path.is_dir():
-            return candidate_path
+        # 7. PASO CARPETAS DE USUARIO: Descargas / Downloads
+        if any(w in q for w in ("descarga", "download")):
+            for cand in (home / "Downloads", home / "Descargas"):
+                if cand.exists() and cand.is_dir():
+                    return cand
 
-        # Por defecto, organizar Descargas (la carpeta más común)
+        # 8. PASO CARPETAS DE USUARIO: Imágenes / Fotos
+        if any(w in q for w in ("imagen", "imágenes", "imagenes", "foto", "fotos", "picture", "pictures")):
+            for cand in (home / "Pictures", home / "Imágenes", home / "Imagenes"):
+                if cand.exists() and cand.is_dir():
+                    return cand
+
+        # 9. PASO CARPETAS DE USUARIO: Música
+        if any(w in q for w in ("musica", "música", "music")):
+            for cand in (home / "Music", home / "Música"):
+                if cand.exists() and cand.is_dir():
+                    return cand
+
+        # 10. PASO CARPETAS DE USUARIO: Videos
+        if any(w in q for w in ("video", "videos", "vídeos")):
+            for cand in (home / "Videos", home / "Vídeos"):
+                if cand.exists() and cand.is_dir():
+                    return cand
+
+        # 11. Búsqueda por subcarpeta específica nombrada en home o OneDrive (ej: "scans", "proyectos")
+        words = [w.strip(",.;:\"'!?") for w in q.split() if len(w) > 3]
+        for w in words:
+            for parent_dir in [home] + list(home.glob("OneDrive*")):
+                if parent_dir.is_dir():
+                    try:
+                        for sub in parent_dir.iterdir():
+                            if sub.is_dir() and sub.name.lower() == w.lower():
+                                return sub
+                    except Exception:
+                        pass
+
+        # Por defecto, Descargas (la carpeta más común)
         for cand in (home / "Downloads", home / "Descargas"):
-            if cand.exists():
+            if cand.exists() and cand.is_dir():
                 return cand
         return home / "Downloads"
 

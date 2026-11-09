@@ -148,6 +148,9 @@ class TestDesktopResolution(unittest.TestCase):
     def setUp(self) -> None:
         self.test_dir = tempfile.mkdtemp()
         self.home = Path(self.test_dir)
+        self.config = UltronConfig()
+        self.config.notes_file = self.home / "notes.json"
+        self.config.memory_file = self.home / "memory.json"
         # Crear estructura simulada de Windows 11 con OneDrive
         self.onedrive_desktop = self.home / "OneDrive" / "Desktop"
         self.onedrive_desktop.mkdir(parents=True, exist_ok=True)
@@ -167,6 +170,42 @@ class TestDesktopResolution(unittest.TestCase):
             resolved = FileOrganizerEngine.resolve_target_directory("organiza mi escritorio")
             # Debe haber seleccionado el escritorio local porque es el que contiene archivos sueltos
             self.assertEqual(resolved.resolve(), self.local_desktop.resolve())
+
+    def test_resolve_explicit_quoted_path(self) -> None:
+        custom_folder = self.home / "OneDrive - Universidad Autonoma de Occidente" / "Scans" / "Documentos"
+        custom_folder.mkdir(parents=True, exist_ok=True)
+        (custom_folder / "scan01.pdf").write_text("dummy", encoding="utf-8")
+
+        query = f'Organiza esta carpeta: "{custom_folder}"'
+        resolved = FileOrganizerEngine.resolve_target_directory(query)
+        self.assertEqual(resolved.resolve(), custom_folder.resolve())
+
+    def test_organize_intent_detection(self) -> None:
+        assistant = UltronAssistant(self.config, text_mode=True, mute=True)
+        self.assertTrue(assistant._is_organize_intent("Ultrón organizo mi carpeta de documentos."))
+        self.assertTrue(assistant._is_organize_intent('Organiza esta carpeta: "C:\\Users\\ASUS\\OneDrive\\Scans"'))
+        self.assertTrue(assistant._is_organize_intent('Organiza esta carpeta: "C:\\Users\\ASUS\\OneDrive\\Escritorio"'))
+        self.assertTrue(assistant._is_organize_intent("limpia mis descargas"))
+        self.assertTrue(assistant._is_organize_intent("ordena los archivos de mi escritorio"))
+        self.assertFalse(assistant._is_organize_intent("hola cómo estás"))
+        self.assertFalse(assistant._is_organize_intent("redacta un correo en gmail"))
+
+    def test_organize_custom_folder_moves_without_deletion(self) -> None:
+        custom_folder = self.home / "Scans"
+        custom_folder.mkdir(parents=True, exist_ok=True)
+        (custom_folder / "factura.pdf").write_text("pdf dummy", encoding="utf-8")
+        (custom_folder / "captura.png").write_bytes(b"\x89PNG")
+        (custom_folder / "script.py").write_text("print('test')", encoding="utf-8")
+
+        organizer = FileOrganizerEngine()
+        result = organizer.organize_directory(str(custom_folder), dry_run=False)
+
+        self.assertEqual(result.total_files_moved, 3)
+        # Verificar que los archivos existen en las subcarpetas y NADA fue borrado
+        self.assertTrue((custom_folder / "Documentos" / "factura.pdf").exists())
+        self.assertTrue((custom_folder / "Imagenes" / "captura.png").exists())
+        self.assertTrue((custom_folder / "Codigo_Scripts" / "script.py").exists())
+        self.assertIn("3 archivos", result.summary_text)
 
 
 class TestMemoryVoiceIntegration(unittest.TestCase):

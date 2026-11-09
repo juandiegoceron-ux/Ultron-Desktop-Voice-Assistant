@@ -100,6 +100,63 @@ class UltronAssistant:
 
         return False
 
+    def _is_organize_intent(self, query: str) -> bool:
+        """
+        Determina si la orden del usuario solicita organizar, ordenar, clasificar o limpiar
+        archivos o carpetas (Descargas, Escritorio, Documentos o cualquier ruta explícita).
+        """
+        q = query.lower().strip()
+
+        # 1. Si contiene una ruta explícita entre comillas o con letra de unidad/ruta
+        has_explicit_path = bool(
+            re.search(r'["\'][^"\']+["\']', query)
+            or re.search(r'[a-zA-Z]:[\\/]', query)
+            or re.search(r'(?:carpeta|directorio|ruta)\s*[:]', query, re.IGNORECASE)
+        )
+
+        # 2. Verbos de acción de organización
+        action_verbs = (
+            "organiza", "organizar", "organizo", "organízame", "organizame", "organices", "organice",
+            "ordena", "ordenar", "ordeno", "ordéname", "ordename", "ordenes", "ordene",
+            "limpia", "limpiar", "limpio", "límpiame", "limpiame", "limpies", "limpie",
+            "clasifica", "clasificar", "clasifico", "clasifícame", "clasificame", "clasifiques", "clasifique",
+            "acomoda", "acomodar", "acomodo", "acomódame", "acomodame",
+            "organize", "clean", "sort", "tidy",
+        )
+        has_verb = any(re.search(rf"\b{v}\b", q) for v in action_verbs)
+
+        if has_verb and has_explicit_path:
+            return True
+
+        # 3. Sustantivos de destino (carpetas estándar o palabras clave de archivos)
+        target_nouns = (
+            "carpeta", "carpetas", "directorio", "directorios", "archivos", "ficheros",
+            "descarga", "descargas", "downloads", "download",
+            "escritorio", "desktop",
+            "documento", "documentos", "documents", "document",
+            "foto", "fotos", "imagen", "imagenes", "imágenes", "pictures", "images",
+            "musica", "música", "music",
+            "video", "videos", "vídeos",
+            "scans", "scan",
+        )
+        has_noun = any(n in q for n in target_nouns)
+
+        if has_verb and has_noun:
+            return True
+
+        # 4. Frases directas comunes
+        direct_phrases = (
+            "organiza mi", "organiza mis", "organizar mi", "organizar mis",
+            "ordena mi", "ordena mis", "ordenar mi", "ordenar mis",
+            "limpia mi", "limpia mis", "limpiar mi", "limpiar mis",
+            "clasifica mi", "clasifica mis", "clasificar mi", "clasificar mis",
+            "organize my", "clean my", "sort my",
+        )
+        if any(p in q for p in direct_phrases):
+            return True
+
+        return False
+
     def reply_lang(self, detected_lang: str) -> str:
         """
         Determina el idioma de respuesta.
@@ -258,29 +315,8 @@ class UltronAssistant:
         if any(trigger in query for trigger in vision_triggers):
             return self.skills.analyze_screen(query=stripped, lang=out_lang)
 
-        # 2.5 Jarvis Pro: Organizador Inteligente de Archivos por Voz (Descargas, Escritorio, Documentos)
-        organize_triggers = (
-            "organiza mis descargas",
-            "organiza descargas",
-            "organizar descargas",
-            "limpia mis descargas",
-            "ordena mis descargas",
-            "organiza mi escritorio",
-            "organiza el escritorio",
-            "organizar escritorio",
-            "limpia mi escritorio",
-            "ordena mi escritorio",
-            "organiza mis documentos",
-            "organiza mi carpeta",
-            "ordena mis archivos",
-            "organiza mis archivos",
-            "organize my downloads",
-            "organize downloads",
-            "organize my desktop",
-            "organize desktop",
-            "clean my downloads",
-        )
-        if any(trigger in query for trigger in organize_triggers):
+        # 2.5 Jarvis Pro: Organizador Inteligente de Archivos por Voz o Rutas Explícitas
+        if self._is_organize_intent(stripped):
             return self.skills.organize_files(query=stripped, lang=out_lang)
 
         # 2.6 Jarvis Pro: Edición In-Place de Portapapeles / Texto Seleccionado

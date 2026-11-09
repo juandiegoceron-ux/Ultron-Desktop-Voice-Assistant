@@ -155,6 +155,7 @@ class UltronAgentLoop:
             '  "tool_name": "nombre_de_la_herramienta",\n'
             '  "arguments": { ... }\n'
             "}\n"
+            "REGLA CRÍTICA PARA ACCIONES DEL SISTEMA: Si el usuario te pide organizar, ordenar o limpiar archivos o carpetas, NUNCA respondas con 'reply' prometiendo o afirmando que lo estás haciendo. DEBES invocar SIEMPRE la herramienta 'organize_directory' con el argumento 'directory'.\n"
             "2. Si la petición es solo una pregunta conversacional, técnica, conceptual o un saludo que no necesita herramientas, responde en este formato:\n"
             "{\n"
             '  "action": "reply",\n'
