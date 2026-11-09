@@ -113,6 +113,7 @@ class UltronConfig:
     # Rutas de datos persistentes
     name_file: Path = field(default_factory=lambda: DATA_DIR / "assistant_name.txt")
     notes_file: Path = field(default_factory=lambda: DATA_DIR / "notes.json")
+    memory_file: Path = field(default_factory=lambda: DATA_DIR / "memory.json")
     screenshots_dir: Path = field(default_factory=lambda: SCREENSHOTS_DIR)
 
     # Accesos directos personalizados del ecosistema de Juan Diego Cerón Duque

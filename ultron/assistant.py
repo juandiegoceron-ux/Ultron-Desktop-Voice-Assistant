@@ -14,8 +14,10 @@ import logging
 import re
 from typing import Optional
 
+from ultron.agent_loop import UltronAgentLoop
 from ultron.config import UltronConfig
 from ultron.llm import UltronBrain
+from ultron.memory import UltronMemory
 from ultron.skills import UltronSkills
 from ultron.strings import detect_language, tr
 from ultron.stt import UltronSTT
@@ -45,6 +47,8 @@ class UltronAssistant:
         )
         self.skills = UltronSkills(self.config, self.tts)
         self.brain = UltronBrain(self.config)
+        self.memory = UltronMemory(self.config)
+        self.agent = UltronAgentLoop(self)
         self._last_skill_context: str = ""
 
     def _is_email_intent(self, query: str) -> bool:
@@ -177,6 +181,59 @@ class UltronAssistant:
             msg = tr(out_lang, "offline", user=self.config.user_name)
             self.tts.speak(msg, lang=out_lang)
             return "EXIT"
+
+        # 1.8 Memoria Episódica y Semántica a Largo Plazo (Opción B)
+        # Recordar un hecho explícito ("recuerda que...", "guarda en memoria que...")
+        remember_match = re.match(
+            r"^(?:recuerda\s+que|recuerda|guarda\s+en\s+memoria\s+que|guarda\s+en\s+tu\s+memoria\s+que|memoriza\s+que|memoriza|remember\s+that|remember)\s*[:,-]?\s*(.+)$",
+            stripped,
+            flags=re.IGNORECASE,
+        )
+        if remember_match:
+            fact = remember_match.group(1).strip()
+            if fact:
+                msg = self.memory.remember(fact)
+                self.tts.speak(msg, lang=out_lang)
+                return msg
+
+        # Consultar o recuperar de memoria ("qué recuerdas de...", "recuerdas algo de...", "qué tienes en memoria de...")
+        recall_match = re.match(
+            r"^(?:qu[eé]\s+recuerdas\s+de|qu[eé]\s+recuerdas\s+sobre|recuerdas\s+algo\s+de|recuerdas\s+algo\s+sobre|qu[eé]\s+tienes\s+en\s+memoria\s+de|qu[eé]\s+tienes\s+en\s+memoria\s+sobre|consulta\s+tu\s+memoria\s+sobre|what\s+do\s+you\s+remember\s+about)\s*[:,-]?\s*(.+)$",
+            stripped,
+            flags=re.IGNORECASE,
+        )
+        if recall_match:
+            topic = recall_match.group(1).strip("¿?¡! ")
+            facts = self.memory.recall(topic)
+            if facts:
+                msg = f"En mi memoria tengo registrado sobre {topic}: {'; '.join(facts)}."
+            else:
+                msg = f"No tengo recuerdos registrados sobre {topic}, {self.config.user_name}."
+            self.tts.speak(msg, lang=out_lang)
+            return msg
+
+        # Resumen de memoria activa / perfil
+        if any(w in query for w in (
+            "resumen de memoria", "resumen de tu memoria", "qué recuerdas", "que recuerdas",
+            "qué tienes en memoria", "que tienes en memoria", "mi perfil", "qué sabes de mí", "que sabes de mi",
+            "memory summary", "what do you remember"
+        )):
+            msg = self.memory.summary()
+            self.tts.speak(msg, lang=out_lang)
+            return msg
+
+        # Olvidar un hecho ("olvida que...", "borra de tu memoria...")
+        forget_match = re.match(
+            r"^(?:olvida\s+que|olvida|borra\s+de\s+tu\s+memoria\s+que|borra\s+de\s+tu\s+memoria|elimina\s+de\s+tu\s+memoria|forget\s+that|forget)\s*[:,-]?\s*(.+)$",
+            stripped,
+            flags=re.IGNORECASE,
+        )
+        if forget_match:
+            fact = forget_match.group(1).strip()
+            if fact:
+                msg = self.memory.forget(fact)
+                self.tts.speak(msg, lang=out_lang)
+                return msg
 
         # 2. Visión Multimodal de Escritorio (Opción C: Debug, UX Audit, Biomedical/PID, General)
         vision_triggers = (
@@ -538,13 +595,23 @@ class UltronAssistant:
         if any(w in query for w in ("reiniciar sistema", "restart system", "redémarrage")):
             return self.skills.system_power("restart", lang=out_lang)
 
+        # 16.5 Bucle Agéntico Autónomo ReAct / Tool-Use (Inspirado en DeepSeek Harness)
+        # Si la orden no coincidió con una regla previa, el agente razona si requiere
+        # herramientas del sistema (organizar carpetas, redactar correos, telemetría, multimedia, memoria, etc.)
+        agent_reply = self.agent.decide_and_execute(query=stripped, lang=out_lang)
+        if agent_reply:
+            return agent_reply
+
         # 17. Cerebro de IA Generativa (Gemini -> Ollama -> Cloud IA Gratuito)
+        mem_ctx = self.memory.get_context_for_prompt()
         answer = self.brain.ask(
             prompt=stripped,
             input_lang=in_lang,
             force_spanish_reply=self.force_spanish_reply,
+            memory_context=mem_ctx,
         )
         self.tts.speak(answer, lang=out_lang)
+        self.memory.record_episode(user_query=stripped, action="conversation", result_summary=answer)
         return answer
 
     def run_forever(self) -> None:

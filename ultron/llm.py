@@ -26,6 +26,7 @@ def build_system_prompt(
     config: UltronConfig,
     response_lang: str = "es",
     input_lang: str = "es",
+    memory_context: str = "",
 ) -> str:
     """
     Construye el prompt de sistema personalizado para Juan Diego Cerón Duque.
@@ -42,6 +43,8 @@ def build_system_prompt(
         if input_lang == "en"
         else "- Juan Diego te está hablando en español: NO le des correcciones de ortografía ni de mayúsculas porque su texto proviene de un micrófono de voz.\n"
     )
+    mem_clause = f"\n{memory_context.strip()}\n" if memory_context else ""
+
     return (
         f"Eres {config.assistant_name}, el asistente de escritorio con inteligencia artificial personal de "
         f"{config.user_name} (Juan Diego Cerón Duque, @juandiegoceron-ux).\n"
@@ -51,6 +54,7 @@ def build_system_prompt(
         "- Creador de proyectos de alto impacto como NutriCoach Pro, Inventario Web Pro (INV. PRO) y controladores PID Bola-Viga.\n"
         "- Filosofía de trabajo: 'El buen diseño es invisible; el buen código también.'\n"
         "- Tienes personalidad estilo Jarvis/Ultrón: leal, brillante, directo, ingenioso y enfocado en ingeniería de primer nivel.\n"
+        f"{mem_clause}"
         f"{english_coach_clause}"
         f"{lang_instruction}\n"
         "REGLAS CRÍTICAS DE VERACIDAD Y ACCIÓN:\n"
@@ -71,14 +75,23 @@ class UltronBrain:
     def __init__(self, config: UltronConfig) -> None:
         self.config = config
 
-    def ask(self, prompt: str, input_lang: str = "es", force_spanish_reply: bool = True) -> str:
+    def ask(
+        self,
+        prompt: str,
+        input_lang: str = "es",
+        force_spanish_reply: bool = True,
+        memory_context: str = "",
+    ) -> str:
         """
         Envía una consulta abierta al LLM disponible.
         Por preferencia de Juan Diego, responde en español incluso cuando él practica en inglés.
         """
         reply_lang = "es" if force_spanish_reply else input_lang
         system_prompt = build_system_prompt(
-            self.config, response_lang=reply_lang, input_lang=input_lang
+            self.config,
+            response_lang=reply_lang,
+            input_lang=input_lang,
+            memory_context=memory_context,
         )
 
         # 1. Intentar con DeepSeek si está configurado como proveedor principal

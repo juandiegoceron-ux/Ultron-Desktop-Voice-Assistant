@@ -466,27 +466,92 @@ class FileOrganizerEngine:
             return home / "Downloads"
 
         if any(w in q for w in ("escritorio", "desktop")):
-            # En Windows 11 con OneDrive activo, el Escritorio suele estar en OneDrive/Desktop o OneDrive/Escritorio
-            for candidate in (
-                home / "OneDrive" / "Escritorio",
-                home / "OneDrive" / "Desktop",
-                home / "Desktop",
-                home / "Escritorio",
-            ):
-                if candidate.exists():
-                    return candidate
-            return home / "Desktop"
+            candidates: List[Path] = []
+            if sys.platform == "win32":
+                try:
+                    import winreg
+
+                    with winreg.OpenKey(
+                        winreg.HKEY_CURRENT_USER,
+                        r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders",
+                    ) as key:
+                        raw_val, _ = winreg.QueryValueEx(key, "Desktop")
+                        reg_path = Path(os.path.expandvars(str(raw_val)))
+                        if reg_path.exists() and reg_path.is_dir():
+                            candidates.append(reg_path)
+                except Exception:
+                    pass
+
+            # Variaciones de OneDrive (Personal, Universidad, etc.)
+            try:
+                for od in home.glob("OneDrive*"):
+                    if od.is_dir():
+                        for sub in ("Escritorio", "Desktop"):
+                            cand = od / sub
+                            if cand.exists() and cand.is_dir() and cand not in candidates:
+                                candidates.append(cand)
+            except Exception:
+                pass
+
+            for cand in (home / "Desktop", home / "Escritorio"):
+                if cand.exists() and cand.is_dir() and cand not in candidates:
+                    candidates.append(cand)
+
+            # Priorizar la carpeta que realmente contiene archivos sueltos para organizar
+            for cand in candidates:
+                try:
+                    has_loose_files = any(
+                        not item.is_dir()
+                        and not item.name.startswith(".")
+                        and item.suffix.lower() not in (".lnk", ".url", ".ini", ".crdownload", ".part", ".tmp")
+                        for item in cand.iterdir()
+                    )
+                    if has_loose_files:
+                        return cand
+                except Exception:
+                    continue
+
+            return candidates[0] if candidates else (home / "Desktop")
 
         if any(w in q for w in ("documento", "document")):
-            for candidate in (
-                home / "OneDrive" / "Documentos",
-                home / "OneDrive" / "Documents",
-                home / "Documents",
-                home / "Documentos",
-            ):
-                if candidate.exists():
-                    return candidate
-            return home / "Documents"
+            candidates = []
+            if sys.platform == "win32":
+                try:
+                    import winreg
+
+                    with winreg.OpenKey(
+                        winreg.HKEY_CURRENT_USER,
+                        r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders",
+                    ) as key:
+                        raw_val, _ = winreg.QueryValueEx(key, "Personal")
+                        reg_path = Path(os.path.expandvars(str(raw_val)))
+                        if reg_path.exists() and reg_path.is_dir():
+                            candidates.append(reg_path)
+                except Exception:
+                    pass
+
+            try:
+                for od in home.glob("OneDrive*"):
+                    if od.is_dir():
+                        for sub in ("Documentos", "Documents"):
+                            cand = od / sub
+                            if cand.exists() and cand.is_dir() and cand not in candidates:
+                                candidates.append(cand)
+            except Exception:
+                pass
+
+            for cand in (home / "Documents", home / "Documentos"):
+                if cand.exists() and cand.is_dir() and cand not in candidates:
+                    candidates.append(cand)
+
+            for cand in candidates:
+                try:
+                    if any(not item.is_dir() and not item.name.startswith(".") for item in cand.iterdir()):
+                        return cand
+                except Exception:
+                    continue
+
+            return candidates[0] if candidates else (home / "Documents")
 
         # Si el usuario pasó una ruta con ~ o ruta directa
         expanded = os.path.expanduser(query_or_path.strip())
@@ -495,6 +560,9 @@ class FileOrganizerEngine:
             return candidate_path
 
         # Por defecto, organizar Descargas (la carpeta más común)
+        for cand in (home / "Downloads", home / "Descargas"):
+            if cand.exists():
+                return cand
         return home / "Downloads"
 
     @staticmethod
