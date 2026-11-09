@@ -823,7 +823,7 @@ class UltronTelemetry:
         status_map = {
             "OPTIMAL": "óptimo",
             "ELEVATED": "con carga elevada",
-            "CRITICAL": "en estado crítico",
+            "CRITICAL": "crítico",
         }
         state_str = status_map.get(rep.status, "operativo")
         parts = [

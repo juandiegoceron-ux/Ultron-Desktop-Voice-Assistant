@@ -67,6 +67,9 @@ def main() -> None:
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
+    for noisy_logger in ("comtypes", "httpx", "httpx2", "httpcore", "httpcore2", "huggingface_hub", "urllib3"):
+        logging.getLogger(noisy_logger).setLevel(logging.ERROR)
+
     args = parse_args()
     config = UltronConfig()
 

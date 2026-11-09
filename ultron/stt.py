@@ -35,9 +35,7 @@ class UltronSTT:
         self.config = config
         self.text_mode = text_mode
         self._whisper_model = None
-
-        if not self.text_mode and self.config.stt_engine == "whisper":
-            self._init_whisper()
+        self._whisper_attempted = False
 
     def _init_whisper(self) -> None:
         """Inicializa faster-whisper de forma perezosa y segura."""
@@ -101,6 +99,10 @@ class UltronSTT:
         print(f"⚙️ {tr(target_lang, 'recognizing')}")
 
         # 1. Intentar con faster-whisper (100% offline y detección nativa de idioma)
+        if self.config.stt_engine == "whisper" and not self._whisper_attempted:
+            self._whisper_attempted = True
+            self._init_whisper()
+
         if self._whisper_model is not None:
             result = self._transcribe_with_whisper(audio, target_lang)
             if result:
