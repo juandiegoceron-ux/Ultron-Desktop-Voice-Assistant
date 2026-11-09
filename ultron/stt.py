@@ -1,15 +1,16 @@
 """
-Motor de Reconocimiento de Voz (Speech-to-Text) Híbrido:
-1. Offline primario con `faster-whisper` (Paso 3 de la hoja de ruta) con detección automática de idioma.
-2. Fallback online con `SpeechRecognition` (Google Speech API).
-3. Modo interactivo por teclado (`text_mode`) para desarrollo o entornos sin micrófono.
+Motor de Reconocimiento de Voz (Speech-to-Text) Híbrido Optimizado:
+1. Calibración única de ruido ambiental al inicio (evita cortar las primeras palabras al hablar).
+2. Reconocimiento de alta precisión bilingüe (Español Colombia `es-CO` e Inglés `en-US`) vía Google Speech API
+   (0 MB de consumo de RAM extra, ideal para laptops con alta carga de memoria).
+3. Fallback 100% Offline con `faster-whisper` enriquecido con `initial_prompt` de vocabulario de Ultrón.
+4. Modo interactivo por teclado (`text_mode`) para desarrollo o entornos sin micrófono.
 """
 
 from __future__ import annotations
 
 import io
 import logging
-import tempfile
 from dataclasses import dataclass
 from typing import Optional
 
@@ -17,6 +18,13 @@ from ultron.config import UltronConfig
 from ultron.strings import detect_language, tr
 
 logger = logging.getLogger("ultron.stt")
+
+ULTRON_WHISPER_PROMPT = (
+    "Ultrón, Hey Ultrón, Oye Ultrón, Juan Diego, NutriCoach, invpro, portafolio, GitHub, "
+    "¿qué hora es?, ¿qué fecha es hoy?, diagnóstico del sistema, telemetría, ¿qué consume mi RAM?, "
+    "mira mi pantalla, analiza mi pantalla, cuéntame un chiste, guarda una nota, lee mis notas, "
+    "What time is it?, How is my PC running?, What is eating my RAM?, Look at my screen, Open my portfolio."
+)
 
 
 @dataclass
@@ -29,16 +37,29 @@ class TranscriptionResult:
 
 
 class UltronSTT:
-    """Gestor de entrada de voz y texto para Ultrón."""
+    """Gestor de entrada de voz y texto de baja latencia para Ultrón."""
 
     def __init__(self, config: UltronConfig, text_mode: bool = False) -> None:
         self.config = config
         self.text_mode = text_mode
         self._whisper_model = None
         self._whisper_attempted = False
+        self._recognizer = None
+        self._calibrated = False
+
+    def _get_recognizer(self) -> object:
+        if self._recognizer is None:
+            import speech_recognition as sr
+
+            r = sr.Recognizer()
+            r.pause_threshold = 0.8
+            r.non_speaking_duration = 0.4
+            r.dynamic_energy_threshold = True
+            self._recognizer = r
+        return self._recognizer
 
     def _init_whisper(self) -> None:
-        """Inicializa faster-whisper de forma perezosa y segura."""
+        """Inicializa faster-whisper de forma perezosa solo cuando se necesita."""
         try:
             from faster_whisper import WhisperModel
 
@@ -53,7 +74,7 @@ class UltronSTT:
             )
         except Exception as exc:
             logger.info(
-                "faster-whisper no disponible (%s). Se usará SpeechRecognition como fallback.",
+                "faster-whisper no disponible (%s). Se usará SpeechRecognition.",
                 exc,
             )
             self._whisper_model = None
@@ -81,14 +102,16 @@ class UltronSTT:
             self.text_mode = True
             return self.listen(lang_hint=target_lang)
 
-        recognizer = sr.Recognizer()
-        recognizer.pause_threshold = 1.0
+        recognizer = self._get_recognizer()
 
         try:
             with sr.Microphone() as source:
-                print(f"🎙️ {tr(target_lang, 'listening')}")
-                recognizer.adjust_for_ambient_noise(source, duration=0.5)
-                audio = recognizer.listen(source, timeout=5, phrase_time_limit=12)
+                if not self._calibrated:
+                    print("🎛️ Calibrando micrófono para el ruido ambiente (1 segundo)...")
+                    recognizer.adjust_for_ambient_noise(source, duration=0.8)  # type: ignore[attr-defined]
+                    self._calibrated = True
+                print(f"🎙️ {tr(target_lang, 'listening')} (Habla ahora)")
+                audio = recognizer.listen(source, timeout=6, phrase_time_limit=10)  # type: ignore[attr-defined]
         except sr.WaitTimeoutError:
             return None
         except OSError as exc:
@@ -98,8 +121,15 @@ class UltronSTT:
 
         print(f"⚙️ {tr(target_lang, 'recognizing')}")
 
-        # 1. Intentar con faster-whisper (100% offline y detección nativa de idioma)
-        if self.config.stt_engine == "whisper" and not self._whisper_attempted:
+        # Modo 1 (Híbrido inteligente): Reconocimiento de alta precisión (es-CO / en-US) sin consumir RAM
+        if self.config.stt_engine != "whisper_offline":
+            result = self._transcribe_with_google(recognizer, audio, target_lang)
+            if result:
+                print(f"🗣️ [{self.config.user_name} | {result.language.upper()}]: {result.text}")
+                return result
+
+        # Modo 2 (Offline faster-whisper a 16kHz o fallback automático si no hay internet)
+        if not self._whisper_attempted:
             self._whisper_attempted = True
             self._init_whisper()
 
@@ -109,22 +139,21 @@ class UltronSTT:
                 print(f"🗣️ [{self.config.user_name} | {result.language.upper()}]: {result.text}")
                 return result
 
-        # 2. Fallback a Google Web Speech API respetando prioridad de idiomas de Juan Diego (ES -> EN -> FR)
-        result = self._transcribe_with_google(recognizer, audio, target_lang)
-        if result:
-            print(f"🗣️ [{self.config.user_name} | {result.language.upper()}]: {result.text}")
-        return result
+        print("⚠️ No alcancé a entender con claridad. Intenta hablar un poco más cerca del micrófono.")
+        return None
 
     def _transcribe_with_whisper(
         self, audio: object, default_lang: str
     ) -> Optional[TranscriptionResult]:
         try:
-            wav_bytes = audio.get_wav_data()  # type: ignore[attr-defined]
+            # Convertir a 16kHz mono para que faster-whisper no distorsione frecuencias de micrófonos de 48kHz
+            wav_bytes = audio.get_wav_data(convert_rate=16000, convert_width=2)  # type: ignore[attr-defined]
             wav_stream = io.BytesIO(wav_bytes)
             segments, info = self._whisper_model.transcribe(  # type: ignore[union-attr]
                 wav_stream,
-                beam_size=3,
+                beam_size=5,
                 vad_filter=True,
+                initial_prompt=ULTRON_WHISPER_PROMPT,
             )
             text = " ".join(seg.text.strip() for seg in segments).strip()
 
@@ -172,6 +201,6 @@ class UltronSTT:
             except sr.UnknownValueError:
                 continue
             except sr.RequestError as exc:
-                logger.error("Servicio de reconocimiento de Google no disponible: %s", exc)
+                logger.debug("Google Speech API sin conexión: %s", exc)
                 break
         return None

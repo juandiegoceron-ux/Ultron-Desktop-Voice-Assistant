@@ -35,9 +35,9 @@ class UltronConfig:
         default_factory=lambda: os.getenv("ULTRON_DEFAULT_LANG", "es")
     )
 
-    # Paso 3: STT (faster-whisper offline vs google)
+    # Paso 3: STT ("hybrid": Google STT rápido sin consumir RAM + fallback offline a faster-whisper)
     stt_engine: str = field(
-        default_factory=lambda: os.getenv("ULTRON_STT_ENGINE", "whisper").lower()
+        default_factory=lambda: os.getenv("ULTRON_STT_ENGINE", "hybrid").lower()
     )
     whisper_model: str = field(
         default_factory=lambda: os.getenv("ULTRON_WHISPER_MODEL", "base")
@@ -62,7 +62,12 @@ class UltronConfig:
         default_factory=lambda: os.getenv("ULTRON_LLM_PROVIDER", "gemini").lower()
     )
     gemini_api_key: str = field(
-        default_factory=lambda: os.getenv("GEMINI_API_KEY", "")
+        default_factory=lambda: (
+            ""
+            if os.getenv("GEMINI_API_KEY", "").strip()
+            in ("", "tu_api_key_aqui", "your_api_key_here", "AIzaSyTuClaveAqui...")
+            else os.getenv("GEMINI_API_KEY", "").strip()
+        )
     )
     gemini_model: str = field(
         default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
