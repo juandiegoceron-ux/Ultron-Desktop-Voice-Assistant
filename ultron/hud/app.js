@@ -157,6 +157,38 @@
         );
       },
     },
+    {
+      id: 'cmd-organize-downloads',
+      title: 'Jarvis Pro: Organizar Descargas',
+      subtitle: 'organiza mis descargas — Clasifica PDFs, imágenes, videos, ZIPs y código',
+      category: 'JARVIS PRO',
+      icon: SVG_ICONS.cube,
+      action: () => sendCommand('organiza mis descargas'),
+    },
+    {
+      id: 'cmd-organize-desktop',
+      title: 'Jarvis Pro: Organizar Escritorio',
+      subtitle: 'organiza mi escritorio — Ordena automáticamente los archivos del Escritorio',
+      category: 'JARVIS PRO',
+      icon: SVG_ICONS.cube,
+      action: () => sendCommand('organiza mi escritorio'),
+    },
+    {
+      id: 'cmd-edit-clipboard',
+      title: 'Jarvis Pro: Editar Portapapeles In-Place',
+      subtitle: 'mejora el texto copiado — Limpia o refactoriza el texto de tu portapapeles',
+      category: 'JARVIS PRO',
+      icon: SVG_ICONS.code,
+      action: () => sendCommand('mejora el texto copiado'),
+    },
+    {
+      id: 'cmd-mini-pill',
+      title: 'Jarvis Pro: Modo Píldora Flotante',
+      subtitle: 'Alternar vista compacta de onda acústica (Jarvis Waveform Pill)',
+      category: 'JARVIS PRO',
+      icon: SVG_ICONS.mic,
+      action: () => toggleMiniPillMode(),
+    },
   ];
 
   const state = {
@@ -180,6 +212,7 @@
     micStream: null,
     mediaElementCon: false,
     activeDrawer: null, // null | 'telemetry' | 'vision'
+    miniPillMode: false,
     cmdPaletteOpen: false,
     cmdPaletteSelectedIndex: 0,
     filteredCommands: [...COMMAND_PALETTE_ITEMS],
@@ -192,6 +225,11 @@
     // Topbar & Drawer Triggers
     btnToggleTelemetry: document.getElementById('btn-toggle-telemetry'),
     btnToggleVision: document.getElementById('btn-toggle-vision'),
+    btnMiniPill: document.getElementById('btn-mini-pill'),
+    miniPillDock: document.getElementById('mini-pill-dock'),
+    miniPillMicBtn: document.getElementById('mini-pill-mic-btn'),
+    miniPillExpandBtn: document.getElementById('mini-pill-expand-btn'),
+    miniPillText: document.getElementById('mini-pill-text'),
     pillCpuVal: document.getElementById('pill-cpu-val'),
     pillRamVal: document.getElementById('pill-ram-val'),
     cmdPaletteTriggerBtn: document.getElementById('cmd-palette-trigger-btn'),
@@ -328,6 +366,22 @@
     }
   }
 
+  function toggleMiniPillMode(forceState) {
+    const nextState = typeof forceState === 'boolean' ? forceState : !state.miniPillMode;
+    state.miniPillMode = nextState;
+    document.body.classList.toggle('mini-pill-mode', nextState);
+    if (dom.btnMiniPill) {
+      dom.btnMiniPill.classList.toggle('active', nextState);
+      dom.btnMiniPill.setAttribute('aria-pressed', String(nextState));
+    }
+    if (dom.miniPillDock) {
+      dom.miniPillDock.classList.toggle('hidden', !nextState);
+    }
+    if (nextState) {
+      closeDrawers();
+    }
+  }
+
   // ==========================================================================
   // UI STATE MANAGEMENT
   // ==========================================================================
@@ -343,18 +397,22 @@
       case 'listening':
         dom.reactorStateBadge.textContent = 'Escuchando';
         dom.bargeInBtn.classList.add('hidden');
+        if (dom.miniPillText) dom.miniPillText.textContent = 'ESCUCHANDO...';
         break;
       case 'processing':
         dom.reactorStateBadge.textContent = 'Procesando...';
         dom.bargeInBtn.classList.add('hidden');
+        if (dom.miniPillText) dom.miniPillText.textContent = 'PROCESANDO ORDEN...';
         break;
       case 'speaking':
         dom.reactorStateBadge.textContent = 'Hablando';
         dom.bargeInBtn.classList.remove('hidden');
+        if (dom.miniPillText) dom.miniPillText.textContent = 'ULTRÓN HABLANDO...';
         break;
       default:
         dom.reactorStateBadge.textContent = 'En espera';
         dom.bargeInBtn.classList.add('hidden');
+        if (dom.miniPillText) dom.miniPillText.textContent = 'ULTRÓN EN ESPERA';
         break;
     }
   }
@@ -362,6 +420,9 @@
   function updateLiveTranscriptDisplay(text, isPlaceholder = false) {
     if (!dom.liveTranscript) return;
     dom.liveTranscript.textContent = text;
+    if (dom.miniPillText && !isPlaceholder && text) {
+      dom.miniPillText.textContent = text;
+    }
     if (isPlaceholder) {
       dom.liveTranscript.classList.add('placeholder');
       dom.transcriptDot.classList.remove('active');
@@ -1529,6 +1590,26 @@
     }
     if (dom.drawerBackdrop) {
       dom.drawerBackdrop.addEventListener('click', closeDrawers);
+    }
+
+    // Mini-Pill Floating Waveform Mode (Jarvis Pro)
+    if (dom.btnMiniPill) {
+      dom.btnMiniPill.addEventListener('click', () => toggleMiniPillMode());
+    }
+    if (dom.miniPillExpandBtn) {
+      dom.miniPillExpandBtn.addEventListener('click', () => toggleMiniPillMode(false));
+    }
+    if (dom.miniPillMicBtn) {
+      dom.miniPillMicBtn.addEventListener('click', () => {
+        ensureAudioContext();
+        if (state.isSpeaking) {
+          stopSpeakingBargeIn();
+        } else if (state.voiceMode === 'muted') {
+          setVoiceMode('handsfree');
+        } else if (!state.recognitionRunning) {
+          safeStartRecognition();
+        }
+      });
     }
 
     // Neural Voice Toggle

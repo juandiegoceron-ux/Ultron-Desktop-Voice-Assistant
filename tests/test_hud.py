@@ -93,7 +93,7 @@ class TestStarkHUDServer(unittest.TestCase):
         self.assertTrue(data["ok"])
         self.assertEqual(data["assistant_name"], "Ultrón")
         self.assertEqual(data["user_name"], "Juan Diego")
-        self.assertEqual(data["version"], "4.0.0")
+        self.assertEqual(data["version"], "5.2.0")
         self.assertIn("Stark HUD", data["architecture"])
         self.assertTrue(data["llm_backends"]["cloud_fallback_ready"])
 
@@ -156,6 +156,40 @@ class TestStarkHUDServer(unittest.TestCase):
         for chunk in chunks:
             self.assertLessEqual(len(chunk), 100)
 
+    def test_jarvis_pro_smart_dictation_and_api_dictate(self) -> None:
+        res = self._post_json(
+            "/api/dictate",
+            {
+                "text": "eh revisa el archivo readme punto md a las 4pm no perdón a las 3pm",
+                "mode": "dictate",
+                "auto_paste": False,
+            },
+        )
+        self.assertTrue(res["ok"])
+        self.assertIn("readme.md", res["output_text"])
+        self.assertIn("3pm", res["output_text"])
+        self.assertNotIn("4pm", res["output_text"])
+
+    def test_jarvis_pro_file_organizer_and_api_organize(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            (tmp_path / "informe.pdf").write_text("PDF dummy", encoding="utf-8")
+            (tmp_path / "diagrama.png").write_bytes(b"\x89PNG\r\n")
+            (tmp_path / "control_pid.py").write_text("print('pid')", encoding="utf-8")
+            (tmp_path / "setup.zip").write_bytes(b"PK\x03\x04")
+
+            res = self._post_json("/api/organize", {"target": str(tmp_path), "dry_run": False})
+            self.assertTrue(res["ok"])
+            self.assertEqual(res["total_moved"], 4)
+            self.assertTrue((tmp_path / "Documentos" / "informe.pdf").exists())
+            self.assertTrue((tmp_path / "Imagenes" / "diagrama.png").exists())
+            self.assertTrue((tmp_path / "Codigo_Scripts" / "control_pid.py").exists())
+            self.assertTrue((tmp_path / "Instaladores_Zip" / "setup.zip").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
+

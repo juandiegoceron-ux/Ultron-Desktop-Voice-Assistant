@@ -28,6 +28,7 @@ import pyjokes
 import wikipedia
 
 from ultron.config import UltronConfig
+from ultron.jarvis_pro import FileOrganizerEngine, SmartDictationEngine
 from ultron.strings import tr
 from ultron.telemetry import UltronTelemetry
 from ultron.tts import UltronTTS
@@ -93,7 +94,7 @@ POPULAR_WEBSITES_MAP: Dict[str, str] = {
 
 
 class UltronSkills:
-    """Conjunto de habilidades locales, de telemetría y visión multimodal ejecutables por Ultrón."""
+    """Conjunto de habilidades locales, de telemetría, visión multimodal y Jarvis Pro ejecutables por Ultrón."""
 
     def __init__(self, config: UltronConfig, tts: UltronTTS) -> None:
         self.config = config
@@ -101,6 +102,8 @@ class UltronSkills:
         self.config.ensure_dirs()
         self.telemetry = UltronTelemetry(user_name=self.config.user_name)
         self.vision = UltronVision(config=self.config)
+        self.dictation = SmartDictationEngine(config=self.config)
+        self.file_organizer = FileOrganizerEngine(user_name=self.config.user_name)
 
     def greet(self, lang: str = "es") -> str:
         """Saluda a Juan Diego según la hora del día."""
@@ -516,3 +519,39 @@ class UltronSkills:
             subprocess.Popen(["open", str(path)])
         else:
             subprocess.Popen(["xdg-open", str(path)])
+
+    # ──────────────────────────────────────────────────────────────────────
+    # 12. Jarvis Pro Capabilities (File Organizer + Smart Dictation + In-Place Edit)
+    # ──────────────────────────────────────────────────────────────────────
+
+    def organize_files(self, query: str, dry_run: bool = False, lang: str = "es") -> str:
+        """Organiza inteligentemente los archivos de una carpeta (Descargas, Escritorio, Documentos)."""
+        res = self.file_organizer.organize_directory(query, dry_run=dry_run)
+        msg = res.summary_text
+        self.tts.speak(msg, lang=lang)
+        return msg
+
+    def smart_dictate(self, raw_text: str, auto_paste: bool = False, lang: str = "es") -> str:
+        """Limpia muletillas, auto-correcciones y extensiones habladas, y copia/pega el resultado."""
+        res = self.dictation.dictate(raw_text, auto_paste=auto_paste)
+        msg = res.spoken_summary
+        self.tts.speak(msg, lang=lang)
+        return f"{msg}\nTexto limpio: \"{res.output_text}\""
+
+    def edit_clipboard_text(
+        self,
+        instruction: str,
+        source_text: Optional[str] = None,
+        auto_paste: bool = False,
+        lang: str = "es",
+    ) -> str:
+        """Transforma in-place el texto seleccionado o del portapapeles sin texto conversacional extra."""
+        res = self.dictation.edit_selected_or_clipboard_text(
+            instruction=instruction,
+            source_text=source_text,
+            auto_paste=auto_paste,
+        )
+        msg = res.spoken_summary
+        self.tts.speak(msg, lang=lang)
+        return f"{msg}\nResultado:\n{res.output_text}"
+

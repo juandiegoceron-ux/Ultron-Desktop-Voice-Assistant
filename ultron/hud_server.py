@@ -155,6 +155,14 @@ class StarkHUDRequestHandler(BaseHTTPRequestHandler):
             self._handle_api_vision()
             return
 
+        if route == "/api/dictate":
+            self._handle_api_dictate()
+            return
+
+        if route == "/api/organize":
+            self._handle_api_organize()
+            return
+
         self._send_json(404, {"ok": False, "error": f"Ruta POST no encontrada: {route}"})
 
     # ------------------------------------------------------------------
@@ -166,8 +174,8 @@ class StarkHUDRequestHandler(BaseHTTPRequestHandler):
         file_path = self.server.hud_dir / filename
         if not file_path.exists():
             fallback_html = (
-                "<!doctype html><html><head><meta charset='utf-8'><title>Stark HUD v4.0</title></head>"
-                "<body><h1>Ultrón Stark HUD v4.0</h1></body></html>"
+                "<!doctype html><html><head><meta charset='utf-8'><title>Stark HUD v5.2</title></head>"
+                "<body><h1>Ultrón Stark HUD v5.2</h1></body></html>"
             ).encode("utf-8")
             self.send_response(200 if filename == "index.html" else 404)
             self.send_header("Content-Type", content_type)
@@ -191,8 +199,8 @@ class StarkHUDRequestHandler(BaseHTTPRequestHandler):
             "ok": True,
             "assistant_name": assistant.config.load_assistant_name(),
             "user_name": assistant.config.user_name,
-            "version": "4.0.0",
-            "architecture": "Stark HUD Hybrid (WebAudio + Neural TTS + Python OS Core)",
+            "version": "5.2.0",
+            "architecture": "Stark HUD v5.2 (Spatial UI + Jarvis Pro Dictation & File Organizer)",
             "llm_backends": {
                 "gemini_configured": bool(assistant.config.gemini_api_key),
                 "cloud_fallback_ready": True,
@@ -310,6 +318,37 @@ class StarkHUDRequestHandler(BaseHTTPRequestHandler):
                 "image_data_url": image_data_url,
             },
         )
+
+    def _handle_api_dictate(self) -> None:
+        body = self._read_json_body()
+        text = str(body.get("text") or "").strip()
+        mode = str(body.get("mode") or "dictate").strip().lower()
+        source_text = body.get("source_text")
+        auto_paste = bool(body.get("auto_paste", False))
+
+        assistant = self.server.assistant
+        if mode == "edit":
+            res = assistant.skills.dictation.edit_selected_or_clipboard_text(
+                instruction=text or "Mejora la redacción y claridad del texto",
+                source_text=str(source_text) if source_text else None,
+                auto_paste=auto_paste,
+            )
+        else:
+            res = assistant.skills.dictation.dictate(
+                raw_text=text,
+                auto_paste=auto_paste,
+            )
+        self._send_json(200, {"ok": True, **res.to_dict()})
+
+    def _handle_api_organize(self) -> None:
+        body = self._read_json_body()
+        target = str(body.get("target") or "descargas").strip()
+        dry_run = bool(body.get("dry_run", False))
+
+        assistant = self.server.assistant
+        res = assistant.skills.file_organizer.organize_directory(target, dry_run=dry_run)
+        self._send_json(200, {"ok": True, **res.to_dict()})
+
 
 
 def create_hud_server(

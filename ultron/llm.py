@@ -93,6 +93,60 @@ class UltronBrain:
 
         return tr(reply_lang, "llm_fallback_unavailable")
 
+    def generate_raw(
+        self,
+        prompt: str,
+        system_prompt: str,
+        temperature: float = 0.2,
+        max_tokens: int = 400,
+    ) -> Optional[str]:
+        """
+        Genera una respuesta directa del LLM sin preámbulos de conversación para
+        edición in-place de texto, enrutamiento de herramientas o formateo estructurado.
+        """
+        # 1. Gemini
+        if self.config.llm_provider == "gemini" and self.config.gemini_api_key:
+            try:
+                from google import genai
+                from google.genai import types
+
+                client = genai.Client(api_key=self.config.gemini_api_key)
+                response = client.models.generate_content(
+                    model=self.config.gemini_model,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_prompt,
+                        temperature=temperature,
+                        max_output_tokens=max_tokens,
+                    ),
+                )
+                if response and response.text:
+                    return response.text.strip()
+            except Exception as exc:
+                logger.debug("Gemini generate_raw failed: %s", exc)
+
+        # 2. Ollama
+        if self.config.llm_provider == "ollama" or not self.config.gemini_api_key:
+            try:
+                url = f"{self.config.ollama_base_url.rstrip('/')}/api/generate"
+                payload = {
+                    "model": self.config.ollama_model,
+                    "system": system_prompt,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {"temperature": temperature},
+                }
+                resp = requests.post(url, json=payload, timeout=4)
+                if resp.status_code == 200:
+                    answer = resp.json().get("response", "").strip()
+                    if answer:
+                        return answer
+            except Exception as exc:
+                logger.debug("Ollama generate_raw failed: %s", exc)
+
+        # 3. Cloud LLM Fallback
+        return self._ask_free_cloud_llm(prompt, system_prompt)
+
     @staticmethod
     def _clean_for_tts(text: str) -> str:
         """Limpia símbolos de markdown (`**`, `#`, backticks) para que la voz de Windows lea con naturalidad."""

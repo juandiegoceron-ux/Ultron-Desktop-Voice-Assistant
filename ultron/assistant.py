@@ -146,6 +146,66 @@ class UltronAssistant:
         if any(trigger in query for trigger in vision_triggers):
             return self.skills.analyze_screen(query=stripped, lang=out_lang)
 
+        # 2.5 Jarvis Pro: Organizador Inteligente de Archivos por Voz (Descargas, Escritorio, Documentos)
+        organize_triggers = (
+            "organiza mis descargas",
+            "organiza descargas",
+            "organizar descargas",
+            "limpia mis descargas",
+            "ordena mis descargas",
+            "organiza mi escritorio",
+            "organiza el escritorio",
+            "organizar escritorio",
+            "limpia mi escritorio",
+            "ordena mi escritorio",
+            "organiza mis documentos",
+            "organiza mi carpeta",
+            "ordena mis archivos",
+            "organiza mis archivos",
+            "organize my downloads",
+            "organize downloads",
+            "organize my desktop",
+            "organize desktop",
+            "clean my downloads",
+        )
+        if any(trigger in query for trigger in organize_triggers):
+            return self.skills.organize_files(query=stripped, lang=out_lang)
+
+        # 2.6 Jarvis Pro: Edición In-Place de Portapapeles / Texto Seleccionado
+        clipboard_edit_triggers = (
+            "traduce el texto copiado",
+            "traduce lo que copié",
+            "traduce lo que copie",
+            "traduce mi portapapeles",
+            "mejora el texto copiado",
+            "mejora este texto",
+            "corrige el texto copiado",
+            "haz más formal el texto",
+            "haz mas formal el texto",
+            "refactoriza el código copiado",
+            "refactoriza el codigo copiado",
+            "resume el texto copiado",
+            "edita el texto copiado",
+            "edita el texto seleccionado",
+            "edit clipboard",
+            "translate clipboard",
+            "improve copied text",
+        )
+        if any(trigger in query for trigger in clipboard_edit_triggers):
+            return self.skills.edit_clipboard_text(instruction=stripped, lang=out_lang)
+
+        # 2.7 Jarvis Pro: Dictado Inteligente con Auto-Corrección ("dicta ...", "escribe esto ...")
+        dictate_match = re.match(
+            r"^(?:dicta|dictar|modo dictado|escribe esto|pega esto|dictate)\s*[:,-]?\s*(.+)$",
+            stripped,
+            flags=re.IGNORECASE,
+        )
+        if dictate_match:
+            raw_dictation = dictate_match.group(1).strip()
+            if raw_dictation:
+                return self.skills.smart_dictate(raw_text=raw_dictation, lang=out_lang)
+
+
         # 3. Telemetría: Top Procesos devoradores de RAM o CPU (Opción B)
         top_proc_triggers = (
             "qué consume mi ram",
