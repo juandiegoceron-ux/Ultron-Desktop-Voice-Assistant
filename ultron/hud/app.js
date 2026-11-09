@@ -1267,16 +1267,22 @@
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = lang.startsWith('en') ? 'en-US' : 'es-CO';
-    utterance.rate = 1.03;
-    utterance.pitch = 0.96;
+    utterance.rate = 0.92;
+    utterance.pitch = 0.72; // Tono barítono oscuro y robótico alusivo a Ultrón
 
     const voices = window.speechSynthesis.getVoices();
     const preferredVoice =
       voices.find(
         (v) =>
           v.lang.toLowerCase().startsWith('es') &&
-          /natural|neural|sabina|helena|dalia|jorge|google/i.test(v.name)
-      ) || voices.find((v) => v.lang.toLowerCase().startsWith('es'));
+          /jorge|raul|pablo|gonzalo|diego|carlos|alonso|male|david/i.test(v.name)
+      ) ||
+      voices.find(
+        (v) =>
+          v.lang.toLowerCase().startsWith('es') &&
+          /natural|neural/i.test(v.name)
+      ) ||
+      voices.find((v) => v.lang.toLowerCase().startsWith('es'));
 
     if (preferredVoice) {
       utterance.voice = preferredVoice;

@@ -37,7 +37,7 @@ class UltronAssistant:
     ) -> None:
         self.config = config or UltronConfig()
         self.force_spanish_reply = force_spanish_reply
-        self.tts = UltronTTS(mute=mute)
+        self.tts = UltronTTS(config=self.config, mute=mute)
         self.stt = UltronSTT(self.config, text_mode=text_mode)
         self.wake_detector = WakeWordDetector(
             wake_words=self.config.wake_words,

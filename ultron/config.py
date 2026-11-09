@@ -93,6 +93,23 @@ class UltronConfig:
         default_factory=lambda: os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
     )
 
+    # Configuración de Personalización de Voz (Perfil Ultrón Oscuro / Barítono robótico)
+    voice_profile: str = field(
+        default_factory=lambda: os.getenv("ULTRON_VOICE_PROFILE", "ultron").lower()
+    )
+    voice_pitch: str = field(
+        default_factory=lambda: os.getenv("ULTRON_VOICE_PITCH", "-22Hz")
+    )
+    voice_rate: str = field(
+        default_factory=lambda: os.getenv("ULTRON_VOICE_RATE", "-4%")
+    )
+    voice_name_es: str = field(
+        default_factory=lambda: os.getenv("ULTRON_VOICE_NAME_ES", "es-MX-JorgeNeural")
+    )
+    voice_name_en: str = field(
+        default_factory=lambda: os.getenv("ULTRON_VOICE_NAME_EN", "en-US-ChristopherNeural")
+    )
+
     # Rutas de datos persistentes
     name_file: Path = field(default_factory=lambda: DATA_DIR / "assistant_name.txt")
     notes_file: Path = field(default_factory=lambda: DATA_DIR / "notes.json")

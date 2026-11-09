@@ -12,12 +12,33 @@ import sys
 import threading
 import urllib.parse
 import urllib.request
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from ultron.config import UltronConfig
 
 logger = logging.getLogger("ultron.tts")
 
+VOICE_PROFILES: Dict[str, Dict[str, Dict[str, str]]] = {
+    "ultron": {  # Perfil Oscuro / Barítono robótico estilo Ultrón (Imponente, calculador, frío)
+        "es": {"voice": "es-MX-JorgeNeural", "pitch": "-22Hz", "rate": "-4%"},
+        "en": {"voice": "en-US-ChristopherNeural", "pitch": "-24Hz", "rate": "-5%"},
+        "fr": {"voice": "fr-FR-HenriNeural", "pitch": "-18Hz", "rate": "-4%"},
+    },
+    "jarvis": {  # Perfil Jarvis / Tecnológico británico y sofisticado
+        "es": {"voice": "es-ES-AlvaroNeural", "pitch": "-6Hz", "rate": "+0%"},
+        "en": {"voice": "en-GB-RyanNeural", "pitch": "-6Hz", "rate": "+0%"},
+        "fr": {"voice": "fr-FR-HenriNeural", "pitch": "+0Hz", "rate": "+0%"},
+    },
+    "natural": {  # Perfil Neutro Latino estándar
+        "es": {"voice": "es-CO-GonzaloNeural", "pitch": "+0Hz", "rate": "+0%"},
+        "en": {"voice": "en-US-ChristopherNeural", "pitch": "+0Hz", "rate": "+0%"},
+        "fr": {"voice": "fr-FR-HenriNeural", "pitch": "+0Hz", "rate": "+0%"},
+    },
+}
+
 NEURAL_VOICE_MAP: Dict[str, str] = {
-    "es": "es-CO-GonzaloNeural",
+    "es": "es-MX-JorgeNeural",
     "en": "en-US-ChristopherNeural",
     "fr": "fr-FR-HenriNeural",
 }
@@ -26,7 +47,14 @@ NEURAL_VOICE_MAP: Dict[str, str] = {
 class UltronTTS:
     """Envoltura segura y multilingüe para síntesis de voz en Windows, Linux y macOS."""
 
-    def __init__(self, rate: int = 175, volume: float = 1.0, mute: bool = False) -> None:
+    def __init__(
+        self,
+        config: Optional[UltronConfig] = None,
+        rate: int = 175,
+        volume: float = 1.0,
+        mute: bool = False,
+    ) -> None:
+        self.config = config
         self.mute = mute
         self.rate = rate
         self.volume = volume
@@ -98,15 +126,24 @@ class UltronTTS:
         if lang_key not in ("es", "en", "fr"):
             lang_key = "es"
 
-        # Nivel 1: edge_tts (Neural Voice de alta fidelidad)
+        # Obtener configuración del perfil de voz activo
+        profile_key = getattr(self.config, "voice_profile", "ultron") or "ultron"
+        profile_lang_dict = VOICE_PROFILES.get(profile_key.lower(), VOICE_PROFILES["ultron"])
+        default_profile = VOICE_PROFILES["ultron"].get(lang_key, {"voice": "es-MX-JorgeNeural", "pitch": "-22Hz", "rate": "-4%"})
+        profile = profile_lang_dict.get(lang_key, default_profile)
+
+        override_voice = getattr(self.config, f"voice_name_{lang_key}", "")
+        voice = override_voice or profile.get("voice", "es-MX-JorgeNeural")
+        pitch = getattr(self.config, "voice_pitch", "") or profile.get("pitch", "-22Hz")
+        rate = getattr(self.config, "voice_rate", "") or profile.get("rate", "-4%")
+
+        # Nivel 1: edge_tts (Neural Voice de alta fidelidad con modulación barítono oscura)
         try:
             import asyncio
             import edge_tts  # type: ignore[import-not-found]
 
-            voice = NEURAL_VOICE_MAP.get(lang_key, "es-CO-GonzaloNeural")
-
             async def _edge_stream() -> bytes:
-                communicate = edge_tts.Communicate(clean_text, voice)
+                communicate = edge_tts.Communicate(clean_text, voice, pitch=pitch, rate=rate)
                 audio_buf = bytearray()
                 async for chunk in communicate.stream():
                     if chunk.get("type") == "audio" and chunk.get("data"):
@@ -199,14 +236,14 @@ class UltronTTS:
 
             pythoncom.CoInitialize()
             speaker = win32com.client.Dispatch("SAPI.SpVoice")
-            speaker.Rate = 1
+            speaker.Rate = -1  # Ritmo deliberado, pausado e imponente estilo Ultrón
             speaker.Volume = 100
 
             lang_keywords = {
-                "es": ("spanish", "español", "es-", "sabina", "helena", "pablo", "raul", "dalia"),
-                "en": ("english", "en-", "david", "zira", "mark"),
-                "fr": ("french", "français", "fr-", "hortense", "paul"),
-            }.get(lang, ("spanish", "español", "es-"))
+                "es": ("raul", "pablo", "jorge", "david", "spanish", "español", "es-"),
+                "en": ("david", "mark", "george", "richard", "english", "en-"),
+                "fr": ("paul", "henri", "french", "français", "fr-"),
+            }.get(lang, ("raul", "pablo", "jorge", "spanish", "español", "es-"))
 
             for v in speaker.GetVoices():
                 desc = v.GetDescription().lower()

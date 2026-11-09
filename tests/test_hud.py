@@ -156,6 +156,22 @@ class TestStarkHUDServer(unittest.TestCase):
         for chunk in chunks:
             self.assertLessEqual(len(chunk), 100)
 
+    def test_ultron_voice_profiles_and_dark_baritone_config(self) -> None:
+        from ultron.config import UltronConfig
+        from ultron.tts import VOICE_PROFILES, UltronTTS
+
+        config = UltronConfig()
+        self.assertEqual(config.voice_profile, "ultron")
+        self.assertEqual(config.voice_pitch, "-22Hz")
+        self.assertEqual(config.voice_rate, "-4%")
+        self.assertEqual(config.voice_name_es, "es-MX-JorgeNeural")
+
+        tts = UltronTTS(config=config, mute=True)
+        self.assertIn("ultron", VOICE_PROFILES)
+        self.assertIn("jarvis", VOICE_PROFILES)
+        self.assertIn("natural", VOICE_PROFILES)
+        self.assertEqual(VOICE_PROFILES["ultron"]["es"]["voice"], "es-MX-JorgeNeural")
+
     def test_jarvis_pro_smart_dictation_and_api_dictate(self) -> None:
         res = self._post_json(
             "/api/dictate",
