@@ -14,12 +14,12 @@ echo.
 if exist "%~dp0.venv\Scripts\python.exe" (
     echo [*] Detectado entorno virtual (.venv)
     set "RUN_CMD="%~dp0.venv\Scripts\python.exe""
-    goto :run
+    goto :check_deps
 )
 if exist "%~dp0venv\Scripts\python.exe" (
     echo [*] Detectado entorno virtual (venv)
     set "RUN_CMD="%~dp0venv\Scripts\python.exe""
-    goto :run
+    goto :check_deps
 )
 
 :: 2. Verificar lanzador py de Windows
@@ -27,7 +27,7 @@ py -3 --version >nul 2>&1
 if %errorlevel% equ 0 (
     echo [*] Detectado lanzador Python (py -3)
     set "RUN_CMD=py -3"
-    goto :run
+    goto :check_deps
 )
 
 :: 3. Verificar python en PATH
@@ -35,7 +35,7 @@ python --version >nul 2>&1
 if %errorlevel% equ 0 (
     echo [*] Detectado Python en PATH
     set "RUN_CMD=python"
-    goto :run
+    goto :check_deps
 )
 
 :: Si llego aqui, no se encontro Python
@@ -50,6 +50,30 @@ echo ====================================================================
 echo.
 pause
 exit /b 1
+
+:check_deps
+:: Verificar si falta la libreria requests u otras basicas en el entorno
+%RUN_CMD% -c "import requests" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo.
+    echo [*] Detectamos que faltan librerias en este entorno de Python.
+    echo [*] Instalando dependencias automaticamente desde requirements.txt...
+    echo     (Esto solo se hace una vez, por favor espera un momento...)
+    echo.
+    %RUN_CMD% -m pip install -r requirements.txt
+    if %errorlevel% neq 0 (
+        echo.
+        echo [ERROR] Fallo la instalacion automatica de librerias.
+        echo Por favor ejecuta manualmente en tu terminal:
+        echo     pip install -r requirements.txt
+        echo.
+        pause
+        exit /b 1
+    )
+    echo.
+    echo [OK] Dependencias instaladas con exito.
+    echo.
+)
 
 :run
 if "%~1"=="" (
