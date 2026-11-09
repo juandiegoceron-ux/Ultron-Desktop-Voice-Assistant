@@ -91,9 +91,47 @@ try {
     Write-Host "[!] Error creando acceso directo de consola: $_" -ForegroundColor Red
 }
 
+# 3. Registrar en el Menú Inicio de Windows (Para que aparezca al presionar tecla Windows y buscar "Ultron")
+try {
+    $programsPath = $null
+    try {
+        $programsPath = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Programs)
+    } catch {
+        $programsPath = $null
+    }
+    if (-not $programsPath -or -not (Test-Path $programsPath)) {
+        try {
+            $programsPath = $wshShell.SpecialFolders.Item("Programs")
+        } catch {
+            $programsPath = $null
+        }
+    }
+    if (-not $programsPath -or -not (Test-Path $programsPath)) {
+        $programsPath = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
+    }
+
+    if (Test-Path $programsPath) {
+        $startMenuShortcutPath = Join-Path $programsPath "Ultrón AI.lnk"
+        $startShortcut = $wshShell.CreateShortcut($startMenuShortcutPath)
+        $startShortcut.TargetPath = $wscriptExe
+        $startShortcut.Arguments = "`"$vbsPath`""
+        $startShortcut.WorkingDirectory = $projectRoot
+        $startShortcut.Description = "Ultrón AI Voice OS & Asistente Jarvis - Juan Diego Ceron"
+        if (Test-Path $iconPath) {
+            $startShortcut.IconLocation = "$iconPath,0"
+        }
+        $startShortcut.Save()
+        Write-Host "[OK] Integrado en Menú Inicio: Ahora puedes buscar 'Ultron' en Windows" -ForegroundColor Green
+    }
+} catch {
+    Write-Host "[!] No se pudo registrar en Menú Inicio (opcional): $_" -ForegroundColor DarkGray
+}
+
 Write-Host ""
 Write-Host "==================================================================" -ForegroundColor Cyan
-Write-Host " ¡LISTO! Ahora puedes abrir a Ultrón con 1 solo clic en tu        " -ForegroundColor Green
-Write-Host " escritorio o pulsando Ctrl + Alt + U en cualquier momento.       " -ForegroundColor Green
+Write-Host " ¡LISTO! Ultrón ahora esta integrado en tu sistema Windows 11:     " -ForegroundColor Green
+Write-Host "   - 1 Clic en tu Escritorio (Ultrón AI)" -ForegroundColor White
+Write-Host "   - Búsqueda de Windows (Tecla Win + 'Ultron')" -ForegroundColor White
+Write-Host "   - Atajo de teclado global: Ctrl + Alt + U" -ForegroundColor Yellow
 Write-Host "==================================================================" -ForegroundColor Cyan
 Write-Host ""
