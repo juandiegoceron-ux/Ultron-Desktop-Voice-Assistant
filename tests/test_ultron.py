@@ -1,9 +1,11 @@
 """
-Suite de pruebas unitarias para validar los 4 pilares de Ultrón:
+Suite de pruebas unitarias e integración para validar los 6 pilares de Ultrón v3.0:
 1. Configuración y personalización para Juan Diego Cerón Duque.
 2. Detección de Wake-Word ("Ultrón" / "Hey Ultrón").
 3. Detección inteligente de idioma (Inglés de entrada -> Español de respuesta).
 4. Habilidades restauradas (notas JSON, chistes, renombrado, fecha/hora).
+5. Telemetría del sistema en tiempo real y detección de procesos pesados por voz.
+6. Visión Multimodal de Escritorio integrada en el asistente.
 """
 
 from __future__ import annotations
@@ -44,18 +46,15 @@ class TestUltronAssistant(unittest.TestCase):
             wake_words=["ultron", "ultrón", "hey ultron", "oye ultrón"],
             enabled=True,
         )
-        # Oración con wake-word en inglés
         m1 = detector.check_transcript("Hey Ultron, what time is it?")
         self.assertTrue(m1.triggered)
         self.assertEqual(m1.wake_word, "hey ultron")
         self.assertEqual(m1.remaining_command, "what time is it?")
 
-        # Oración con wake-word en español
         m2 = detector.check_transcript("Ultrón, abre mi portafolio")
         self.assertTrue(m2.triggered)
         self.assertEqual(m2.remaining_command, "abre mi portafolio")
 
-        # Oración sin wake-word debe ser ignorada
         m3 = detector.check_transcript("what time is it?")
         self.assertFalse(m3.triggered)
 
@@ -65,7 +64,6 @@ class TestUltronAssistant(unittest.TestCase):
         self.assertEqual(detect_language("Quelle heure est-il ?"), "fr")
 
     def test_english_input_forces_spanish_reply(self) -> None:
-        # Juan Diego pregunta la hora en inglés para practicar, Ultrón responde en español
         response = self.assistant.process_command("What time is it?")
         self.assertIn("La hora actual es", response)
 
@@ -85,6 +83,23 @@ class TestUltronAssistant(unittest.TestCase):
     def test_tell_joke_restored(self) -> None:
         joke = self.assistant.process_command("Tell me a joke")
         self.assertTrue(len(joke) > 5)
+
+    def test_system_telemetry_voice_routing(self) -> None:
+        resp = self.assistant.process_command("How is my PC running?")
+        self.assertIn("Diagnóstico de sistemas completado, Juan Diego", resp)
+        self.assertIn("CPU al", resp)
+        self.assertIn("Memoria RAM al", resp)
+
+    def test_top_processes_voice_routing(self) -> None:
+        resp = self.assistant.process_command("What is eating my RAM?")
+        self.assertIn("procesos con mayor consumo de memoria RAM, Juan Diego", resp)
+
+    def test_multimodal_vision_voice_routing(self) -> None:
+        resp = self.assistant.process_command("Look at my screen and debug this error")
+        self.assertTrue(len(resp) > 20)
+        # Verifica que la captura se haya guardado en el directorio de screenshots
+        saved_pngs = list(self.config.screenshots_dir.glob("*.png"))
+        self.assertGreaterEqual(len(saved_pngs), 1)
 
 
 if __name__ == "__main__":

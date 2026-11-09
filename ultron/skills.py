@@ -1,8 +1,10 @@
 """
-Habilidades (Skills) de Automatización de Escritorio de Ultrón (Paso 4).
-Incluye manejo tipado de excepciones, restauración de funciones huérfanas
-(chistes, notas persistentes, cambio de nombre) y accesos rápidos a los
-proyectos de Juan Diego Cerón Duque (NutriCoach Pro, INV. PRO, Portafolio, GitHub).
+Habilidades (Skills) de Automatización de Escritorio de Ultrón.
+Incluye:
+- Telemetría de hardware y procesos en tiempo real (`UltronTelemetry`).
+- Visión Multimodal de Escritorio (`UltronVision`: Debug, UX Audit, Biomedical/PID, General).
+- Funciones restauradas (chistes, notas JSON persistentes, cambio de nombre, Wikipedia, música).
+- Lanzador de proyectos personales de Juan Diego Cerón Duque (NutriCoach Pro, INV. PRO, Portafolio, GitHub).
 """
 
 from __future__ import annotations
@@ -16,25 +18,29 @@ import subprocess
 import sys
 import webbrowser as wb
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import pyjokes
 import wikipedia
 
 from ultron.config import UltronConfig
 from ultron.strings import tr
+from ultron.telemetry import UltronTelemetry
 from ultron.tts import UltronTTS
+from ultron.vision import UltronVision
 
 logger = logging.getLogger("ultron.skills")
 
 
 class UltronSkills:
-    """Conjunto de habilidades locales ejecutables por Ultrón."""
+    """Conjunto de habilidades locales, de telemetría y visión multimodal ejecutables por Ultrón."""
 
     def __init__(self, config: UltronConfig, tts: UltronTTS) -> None:
         self.config = config
         self.tts = tts
         self.config.ensure_dirs()
+        self.telemetry = UltronTelemetry(user_name=self.config.user_name)
+        self.vision = UltronVision(config=self.config)
 
     def greet(self, lang: str = "es") -> str:
         """Saluda a Juan Diego según la hora del día."""
@@ -65,10 +71,47 @@ class UltronSkills:
     def tell_date(self, lang: str = "es") -> str:
         """Informa la fecha actual."""
         now = datetime.datetime.now()
-        date_str = f"{now.day} de {now.strftime('%B')} de {now.year}" if lang == "es" else now.strftime("%d %B %Y")
+        date_str = (
+            f"{now.day} de {now.strftime('%B')} de {now.year}"
+            if lang == "es"
+            else now.strftime("%d %B %Y")
+        )
         msg = tr(lang, "date", date=date_str)
         self.tts.speak(msg, lang=lang)
         return msg
+
+    def system_telemetry(self, lang: str = "es") -> str:
+        """
+        Ejecuta un diagnóstico completo de hardware y sistema operativo (CPU, RAM, Disco, Batería, Procesos)
+        y lo sintetiza por voz con estilo Jarvis/Ultrón.
+        """
+        report_voice = self.telemetry.format_voice_report(lang=lang, include_processes=True)
+        self.tts.speak(report_voice, lang=lang)
+        return report_voice
+
+    def top_processes(self, sort_by: str = "memory", lang: str = "es") -> str:
+        """
+        Informa cuáles son los procesos que más memoria RAM o CPU están consumiendo en tiempo real.
+        """
+        report_voice = self.telemetry.format_top_processes_voice(
+            limit=3, sort_by=sort_by, lang=lang
+        )
+        self.tts.speak(report_voice, lang=lang)
+        return report_voice
+
+    def analyze_screen(
+        self,
+        query: str = "¿Qué hay en mi pantalla?",
+        mode: Optional[str] = None,
+        lang: str = "es",
+    ) -> str:
+        """
+        Captura la pantalla activa y la analiza con Visión Multimodal (Gemini 2.5 Flash / Ollama LLaVA)
+        en modo debug, ux_audit, biomedical_pid o general.
+        """
+        result = self.vision.analyze_screen(user_query=query, mode=mode, lang=lang)
+        self.tts.speak(result.analysis, lang=lang)
+        return result.analysis
 
     def search_wikipedia(self, query: str, lang: str = "es") -> str:
         """Busca un resumen en Wikipedia con manejo explícito de excepciones."""
@@ -167,18 +210,9 @@ class UltronSkills:
         return msg
 
     def take_screenshot(self, lang: str = "es") -> str:
-        """Toma una captura de pantalla con timestamp."""
-        self.config.ensure_dirs()
-        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = self.config.screenshots_dir / f"ultron_capture_{ts}.png"
-        try:
-            import pyautogui
-
-            pyautogui.screenshot().save(str(path))
-            msg = tr(lang, "screenshot", path=path)
-        except Exception as exc:
-            logger.warning("No se pudo capturar pantalla (entorno headless): %s", exc)
-            msg = f"No fue posible tomar la captura en este entorno gráfico ({exc})."
+        """Toma una captura de pantalla tolerante a fallos usando el pipeline de UltronVision."""
+        capture = self.vision.capture_screen()
+        msg = tr(lang, "screenshot", path=capture.file_path)
         self.tts.speak(msg, lang=lang)
         return msg
 
@@ -226,10 +260,18 @@ class UltronSkills:
         """Ejecuta apagado o reinicio del sistema de forma segura."""
         if action == "shutdown":
             msg = tr(lang, "shutdown", user=self.config.user_name)
-            cmd = ["systemctl", "poweroff"] if sys.platform != "win32" else ["shutdown", "/s", "/f", "/t", "1"]
+            cmd = (
+                ["systemctl", "poweroff"]
+                if sys.platform != "win32"
+                else ["shutdown", "/s", "/f", "/t", "1"]
+            )
         else:
             msg = tr(lang, "restart")
-            cmd = ["systemctl", "reboot"] if sys.platform != "win32" else ["shutdown", "/r", "/f", "/t", "1"]
+            cmd = (
+                ["systemctl", "reboot"]
+                if sys.platform != "win32"
+                else ["shutdown", "/r", "/f", "/t", "1"]
+            )
 
         self.tts.speak(msg, lang=lang)
         if not dry_run:

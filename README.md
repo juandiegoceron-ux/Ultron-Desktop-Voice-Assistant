@@ -1,48 +1,54 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=2,6,12&height=190&section=header&text=ULTR%C3%93N%20AI%20ASSISTANT&fontSize=42&fontColor=fff&animation=twinkling&fontAlignY=38&desc=Next-Gen%20Desktop%20Voice%20Assistant%20%7C%20Juan%20Diego%20Cer%C3%B3n%20Duque&descAlignY=62&descAlign=50" width="100%"/>
+<img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=2,6,12&height=190&section=header&text=ULTR%C3%93N%20AI%20ASSISTANT%20v3.0&fontSize=40&fontColor=fff&animation=twinkling&fontAlignY=38&desc=Multimodal%20Vision%20%E2%80%A2%20Real-Time%20Telemetry%20%E2%80%A2%20GenAI%20%7C%20Juan%20Diego%20Cer%C3%B3n%20Duque&descAlignY=62&descAlign=50" width="100%"/>
 
 <br/>
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Google Gemini](https://img.shields.io/badge/Google_Gemini-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white)
+![Google Gemini](https://img.shields.io/badge/Gemini_2.5_Flash-Multimodal_Vision-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white)
+![System Telemetry](https://img.shields.io/badge/Real--Time_Telemetry-psutil-FF6B6B?style=for-the-badge&logo=linux&logoColor=white)
 ![Faster Whisper](https://img.shields.io/badge/Faster_Whisper-Offline_STT-00D9FF?style=for-the-badge&logo=openai&logoColor=white)
-![Linux & Windows](https://img.shields.io/badge/Cross_Platform-Linux_%7C_Windows_%7C_macOS-20232A?style=for-the-badge&logo=linux&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-3ECF8E?style=for-the-badge)
 
 </div>
 
 ---
 
-## ⚡ ¿Qué es Ultrón?
+## ⚡ ¿Qué es Ultrón v3.0?
 
-**Ultrón** es una evolución arquitectónica completa y personalizada del proyecto `Jarvis-Desktop-Voice-Assistant`, diseñada a medida para **Juan Diego Cerón Duque** ([@juandiegoceron-ux](https://github.com/juandiegoceron-ux) — *Ingeniero Biomédico & Full Stack / Mobile Developer*).
+**Ultrón v3.0** es una plataforma de asistencia de escritorio con inteligencia artificial, visión por computadora multimodal y telemetría de sistemas en tiempo real, diseñada a medida para **Juan Diego Cerón Duque** ([@juandiegoceron-ux](https://github.com/juandiegoceron-ux) — *Ingeniero Biomédico & Full Stack / Mobile Developer*).
 
-A diferencia del proyecto original (un script monolítico de 200 líneas con reglas estáticas `if/elif` y funciones incompletas), **Ultrón v2.0** implementa una arquitectura modular de 4 pilares que combina **automatización local de escritorio**, **reconocimiento de voz offline con Whisper**, **activación por Wake-Word** e **Inteligencia Artificial Generativa (Google Gemini / Ollama)**, además de un **modo bilingüe asimétrico** diseñado para que puedas **hablarle en inglés para practicar tu fluidez mientras Ultrón te responde siempre en español**.
+Construido bajo principios de ingeniería de primer nivel (*first-principles engineering*), Ultrón integra **6 pilares arquitectónicos** que transforman tu computadora en un entorno inteligente capaz de **ver tu pantalla**, **diagnosticar tu hardware en tiempo real**, **ejecutar automatizaciones de escritorio** y **conversar de forma bilingüe asimétrica** (tú hablas en inglés para practicar tu fluidez y Ultrón te responde siempre en español).
 
 ---
 
-## 🚀 Los 4 Pilares de Evolución Implementados
+## 🚀 Los 6 Pilares Arquitectónicos de Ultrón v3.0
 
-| # | Pilar Arquitectónico | Estado en Jarvis Original | Implementación en **Ultrón v2.0** |
+| # | Pilar Arquitectónico | Módulo | Capacidades de Ingeniería |
 | :-: | :--- | :--- | :--- |
-| **1** | **IA Generativa (LLM Brain)** | ❌ Inexistente (solo condicionales fijos `if/elif`). | ✅ **Módulo `ultron/llm.py`**: Integración con **Google Gemini (`google-genai`)** y **Ollama local (`llama3.2`)** con contexto personalizado sobre Juan Diego, sus proyectos y feedback para práctica de inglés. |
-| **2** | **Wake-Word Detection** | ❌ Inexistente (escucha indiscriminadamente todo el tiempo). | ✅ **Módulo `ultron/wakeword.py`**: Activación por voz con `"Ultrón"`, `"Hey Ultrón"` u `"Oye Ultrón"`, soportando comandos en una sola oración (*"Hey Ultrón, what time is it?"*) o en dos pasos. |
-| **3** | **STT Offline con Whisper** | ❌ Dependiente de Google Web Speech API con bug de colisión FR/EN. | ✅ **Módulo `ultron/stt.py`**: Motor primario offline con **`faster-whisper`** (`int8`), detección nativa de idioma (`ES` / `EN` / `FR`), fallback a Google STT y modo consola interactivo (`--text`). |
-| **4** | **Refactorización y Habilidades Completas** | ⚠️ Funciones huérfanas (`pyjokes`, notas y cambio de nombre rotos) y `except:` desnudos. | ✅ **Módulo `ultron/skills.py`**: Código modular tipado, excepciones específicas, restauración de **chistes**, **notas persistentes en JSON**, **cambio de nombre** y accesos directos a **NutriCoach Pro**, **INV. PRO**, **Portafolio** y **GitHub**. |
+| **1** | **Cerebro de IA Generativa (LLM)** | `ultron/llm.py` | Integración dual con **Google Gemini (`gemini-2.5-flash`)** y **Ollama local (`llama3.2`)** con contexto personalizado sobre Juan Diego, su stack y modo *coach* de inglés. |
+| **2** | **Detección de Wake-Word** | `ultron/wakeword.py` | Activación por voz con `"Ultrón"`, `"Hey Ultrón"` u `"Oye Ultrón"`, soportando comandos en una sola oración (*"Hey Ultrón, how is my PC running?"*) o en dos pasos. |
+| **3** | **STT Offline con Faster-Whisper** | `ultron/stt.py` | Reconocimiento de voz offline (`int8`) con detección automática de idioma (`ES`/`EN`/`FR`), fallback a Google STT y modo consola (`--text`). |
+| **4** | **Automatización y Proyectos** | `ultron/skills.py` | Notas persistentes en JSON, capturas de pantalla, Wikipedia, música, chistes y lanzador directo de **NutriCoach Pro**, **INV. PRO**, **Portafolio Web** y **GitHub**. |
+| **5** | **Telemetría de Hardware y Procesos** | `ultron/telemetry.py` | Diagnóstico en tiempo real con `psutil` + fallback `/proc`: **CPU (uso, núcleos, MHz, °C), RAM, Swap, Disco, Batería, Red, Uptime**, evaluación de alertas (`OPTIMAL`, `ELEVATED`, `CRITICAL`) y detector de **procesos devoradores de RAM/CPU**. |
+| **6** | **Visión Multimodal de Escritorio** | `ultron/vision.py` | Captura multi-backend tolerante a fallos + análisis visual con **Gemini 2.5 Flash Vision** y **Ollama (`llava`)** en 4 modos automáticos: **`debug`** (errores de código/terminal), **`ux_audit`** (auditoría UI/UX React/Flutter), **`biomedical_pid`** (análisis de gráficas PID y señales biomédicas) y **`general`** (OCR/contexto). |
 
 ---
 
-## 🏗️ Arquitectura del Sistema
+## 🏗️ Arquitectura del Sistema (v3.0)
 
 ```mermaid
 flowchart TD
-    User(["🎙️ Juan Diego (Voz en Inglés / Español o Consola)"]) --> STT["🔊 ultron/stt.py\nFaster-Whisper Offline / SpeechRecognition"]
+    User(["🎙️ Juan Diego (Voz en Inglés / Español o CLI)"]) --> STT["🔊 ultron/stt.py\nFaster-Whisper Offline / SpeechRecognition"]
     STT --> Wake["⚡ ultron/wakeword.py\nDetector 'Ultrón' / 'Hey Ultrón'"]
     Wake -- "Activado" --> Router["🧠 ultron/assistant.py\nIntent Router & Bilingüismo Asimétrico (EN ➔ ES)"]
-    Router -- "Comando de Escritorio" --> Skills["🛠️ ultron/skills.py\nProyectos, Notas JSON, Música, Capturas, Wikipedia"]
-    Router -- "Conversación Abierta / Práctica de Inglés" --> LLM["🤖 ultron/llm.py\nGoogle Gemini 2.5 Flash / Ollama Local"]
-    Skills --> TTS["🗣️ ultron/tts.py\nSíntesis de Voz Multilingüe (Respuesta en Español)"]
+    Router -- "Telemetría / Procesos" --> Telemetry["🛰️ ultron/telemetry.py\nCPU, RAM, Disco, Batería, Temperatura y Top Procesos"]
+    Router -- "Mira mi pantalla / Analiza" --> Vision["👁️ ultron/vision.py\nCaptura Multi-Backend + Gemini Vision / LLaVA"]
+    Router -- "Proyectos y Escritorio" --> Skills["🛠️ ultron/skills.py\nNutriCoach, INV. PRO, Notas JSON, Música, Wikipedia"]
+    Router -- "Conversación Abierta" --> LLM["🤖 ultron/llm.py\nGoogle Gemini 2.5 Flash / Ollama Local"]
+    Telemetry --> TTS["🗣️ ultron/tts.py\nSíntesis de Voz Multilingüe (Respuesta en Español)"]
+    Vision --> TTS
+    Skills --> TTS
     LLM --> TTS
 ```
 
@@ -52,94 +58,86 @@ flowchart TD
 
 ```text
 Ultron-Desktop-Voice-Assistant/
-├── .env.example          # Plantilla de variables de entorno (Gemini, Ollama, Whisper, Wake-Word)
-├── main.py               # CLI principal (--text, --no-wake, --mute, --command)
-├── requirements.txt      # Dependencias actualizadas y fijadas
+├── .env.example            # Configuración de entorno (Gemini, Ollama, LLaVA, Whisper, Wake-Word)
+├── main.py                 # CLI (--text, --no-wake, --mute, --command, --telemetry, --vision)
+├── requirements.txt        # Dependencias de producción
 ├── ultron/
-│   ├── __init__.py       # Metadatos del paquete
-│   ├── config.py         # Configuración global y accesos directos de Juan Diego
-│   ├── strings.py        # Diccionario trilingüe (ES/EN/FR) y detector léxico sin colisiones
-│   ├── tts.py            # Motor Text-to-Speech thread-safe con fallback en consola
-│   ├── stt.py            # Motor Speech-to-Text híbrido (faster-whisper offline + Google STT)
-│   ├── wakeword.py       # Detector de palabra de activación ("Ultrón" / "Hey Ultrón")
-│   ├── llm.py            # Cerebro generativo (Google Gemini API + Ollama Local)
-│   ├── skills.py         # Habilidades del sistema, notas JSON, chistes, música y proyectos
-│   └── assistant.py      # Orquestador principal de Ultrón
+│   ├── __init__.py         # Metadatos v3.0.0
+│   ├── config.py           # Configuración global y accesos directos de Juan Diego
+│   ├── strings.py          # Internacionalización (ES/EN/FR) y detector léxico sin colisiones
+│   ├── tts.py              # Motor Text-to-Speech thread-safe
+│   ├── stt.py              # Motor Speech-to-Text híbrido (faster-whisper offline + Google STT)
+│   ├── wakeword.py         # Detector de palabra de activación ("Ultrón" / "Hey Ultrón")
+│   ├── llm.py              # Cerebro generativo (Google Gemini API + Ollama Local)
+│   ├── telemetry.py        # Motor de telemetría de hardware, procesos y alertas de salud
+│   ├── vision.py           # Sistema de visión multimodal (Debug, UX Audit, Biomedical/PID, General)
+│   ├── skills.py           # Orquestador de habilidades del sistema
+│   └── assistant.py        # Núcleo operativo de Ultrón v3.0
 └── tests/
-    └── test_ultron.py    # Suite de pruebas unitarias automatizadas
+    ├── test_ultron.py      # Pruebas de integración del asistente y enrutamiento de comandos
+    ├── test_telemetry.py   # Pruebas unitarias de telemetría, procesos y umbrales críticos
+    └── test_vision.py      # Pruebas unitarias de captura y visión multimodal (Gemini/Ollama/Fallback)
 ```
 
 ---
 
-## 🎯 Comandos Personalizados (Puedes decirlos en Inglés o Español)
+## 🎯 Comandos de Voz y Consola (Puedes hablarle en Inglés o Español)
 
-Gracias al modo de **práctica de inglés**, puedes hablarle a Ultrón en inglés y él ejecutará la acción y te responderá en español:
+### 🛰️ 1. Telemetría y Diagnóstico en Tiempo Real (`ultron/telemetry.py`)
+* *"Hey Ultron, how is my PC running?"* / *"Ultrón, diagnóstico del sistema"*
+  * ➔ Reporta estado general (`OPTIMAL` / `ELEVATED` / `CRITICAL`), uso de CPU, núcleos, temperatura, RAM usada/total, espacio libre en disco, estado de batería, proceso más pesado y alertas activas.
+* *"Hey Ultron, what is eating my RAM?"* / *"Ultrón, ¿qué consume mi CPU?"*
+  * ➔ Identifica los 3 procesos con mayor consumo de memoria RAM (en MB y %) o procesador (con su nombre y PID).
 
-* **Proyectos de Juan Diego:**
-  * *"Hey Ultron, open NutriCoach"* ➔ Abre **NutriCoach Pro** en el navegador.
-  * *"Hey Ultron, open invpro"* / *"Ultrón, abre inventario"* ➔ Abre **Inventario Web Pro (useinvpro.com)**.
-  * *"Hey Ultron, open my portfolio"* ➔ Abre tu **Portafolio Web**.
-  * *"Hey Ultron, open GitHub"* ➔ Abre `github.com/juandiegoceron-ux`.
-* **Productividad y Notas (Restaurado y Mejorado):**
-  * *"Hey Ultron, take a note: deploy new Supabase migration"* ➔ Guarda la nota con timestamp en `data/notes.json`.
-  * *"Hey Ultron, read my notes"* ➔ Te lee tus últimas notas registradas.
-  * *"Hey Ultron, take a screenshot"* ➔ Guarda captura en `screenshots/ultron_capture_YYYYMMDD_HHMMSS.png`.
-* **Información, Entretenimiento y Sistema:**
-  * *"Hey Ultron, what time is it?"* / *"What's today's date?"*
-  * *"Hey Ultron, search artificial intelligence on Wikipedia"*
-  * *"Hey Ultron, tell me a joke"*
-  * *"Hey Ultron, play music"*
-  * *"Hey Ultron, change your name to Ultrón Prime"*
-* **IA Generativa y Práctica de Inglés (Gemini / Ollama):**
-  * Cualquier pregunta abierta sobre ingeniería biomédica, arquitectura en React/Flutter, control PID o conversación general en inglés será procesada por el motor LLM de Ultrón.
+### 👁️ 2. Visión Multimodal de Escritorio (`ultron/vision.py`)
+* **Modo Depuración (`debug`):** *"Hey Ultron, look at my screen and debug this error"*
+  * ➔ Captura tu pantalla, lee el *traceback* o error en tu IDE/terminal y te dice la causa raíz y cómo corregirlo.
+* **Modo Auditoría UX/UI (`ux_audit`):** *"Hey Ultron, analyze my screen and audit the UX design"*
+  * ➔ Analiza tu interfaz en React, Tailwind o Flutter evaluando contraste, jerarquía visual y espaciado.
+* **Modo Biomédico / Control PID (`biomedical_pid`):** *"Hey Ultron, analyze this PID graph on my screen"*
+  * ➔ Evalúa curvas de respuesta temporal, *overshoot*, tiempo de establecimiento o señales biomédicas y sugiere ajustes de ganancias ($K_p, K_i, K_d$).
+* **Modo General (`general`):** *"Hey Ultron, what is on my screen?"*
+
+### 🚀 3. Ecosistema Personal de Juan Diego y Productividad (`ultron/skills.py`)
+* *"Hey Ultron, open NutriCoach"* ➔ Abre **NutriCoach Pro**.
+* *"Hey Ultron, open invpro"* ➔ Abre **Inventario Web Pro (`useinvpro.com`)**.
+* *"Hey Ultron, open my portfolio"* ➔ Abre tu **Portafolio Web**.
+* *"Hey Ultron, open GitHub"* ➔ Abre `github.com/juandiegoceron-ux`.
+* *"Hey Ultron, take a note: optimize PID controller sampling time"* ➔ Guarda la nota en `data/notes.json`.
+* *"Hey Ultron, read my notes"* ➔ Te lee tus notas registradas.
 
 ---
 
 ## ⚙️ Instalación y Uso Rápido
 
-### 1. Clonar el repositorio y crear entorno virtual
-
 ```bash
+# 1. Clonar y activar entorno virtual
 git clone https://github.com/juandiegoceron-ux/Ultron-Desktop-Voice-Assistant.git
 cd Ultron-Desktop-Voice-Assistant
 python3 -m venv .venv
 source .venv/bin/activate  # En Windows: .venv\Scripts\activate
-```
 
-### 2. Instalar dependencias
-
-```bash
+# 2. Instalar dependencias
 pip install -r requirements.txt
-```
 
-*(Opcional en Linux Ubuntu/Debian para soporte de audio y capturas)*:
-```bash
-sudo apt-get install -y python3-tk python3-dev scrot portaudio19-dev espeak
-```
-
-### 3. Configurar variables de entorno
-
-```bash
+# 3. Configurar variables de entorno
 cp .env.example .env
-# Edita .env y añade tu GEMINI_API_KEY (o usa Ollama local en http://localhost:11434)
+# Añade tu GEMINI_API_KEY en .env (o usa Ollama local con llama3.2 y llava)
 ```
 
-### 4. Ejecutar Ultrón
+### Comandos rápidos desde la terminal
 
 ```bash
-# Modo completo por voz (con Wake-Word "Ultrón" / "Hey Ultrón")
+# Iniciar Ultrón en modo voz completo
 python main.py
 
-# Modo interactivo por consola de texto (ideal para pruebas rápidas sin micrófono)
-python main.py --text --no-wake
+# Ejecutar diagnóstico de telemetría instantáneo
+python main.py --telemetry
 
-# Ejecutar un comando directo desde la terminal
-python main.py --mute --command "What time is it?"
-```
+# Analizar tu pantalla con Visión Multimodal desde la terminal
+python main.py --vision "Look at my screen and debug this error" --vision-mode debug
 
-### 5. Ejecutar las pruebas unitarias
-
-```bash
+# Ejecutar toda la batería de pruebas automatizadas (22 tests)
 python -m unittest discover -s tests -v
 ```
 

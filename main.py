@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Punto de entrada principal de Ultrón - Asistente de Voz Personalizado para Juan Diego Cerón Duque.
+Punto de entrada principal de Ultrón v3.0 - Asistente de Voz, Telemetría y Visión Multimodal
+Personalizado para Juan Diego Cerón Duque (@juandiegoceron-ux).
 """
 
 from __future__ import annotations
@@ -14,7 +15,10 @@ from ultron.config import UltronConfig
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Ultrón: Asistente de Voz de Escritorio con IA Generativa, Whisper Offline y Wake-Word."
+        description=(
+            "Ultrón v3.0: Asistente de Voz de Escritorio con IA Generativa, "
+            "Telemetría en Tiempo Real, Visión Multimodal, Whisper Offline y Wake-Word."
+        )
     )
     parser.add_argument(
         "--text",
@@ -37,6 +41,24 @@ def parse_args() -> argparse.Namespace:
         default="",
         help="Ejecuta un único comando directo y termina.",
     )
+    parser.add_argument(
+        "--telemetry",
+        action="store_true",
+        help="Ejecuta un diagnóstico completo de hardware y procesos en tiempo real y termina.",
+    )
+    parser.add_argument(
+        "--vision",
+        type=str,
+        default="",
+        help="Captura la pantalla activa y la analiza con Visión Multimodal según tu consulta.",
+    )
+    parser.add_argument(
+        "--vision-mode",
+        type=str,
+        default=None,
+        choices=["general", "debug", "ux_audit", "biomedical_pid"],
+        help="Modo especializado opcional para el análisis visual (--vision).",
+    )
     return parser.parse_args()
 
 
@@ -57,6 +79,14 @@ def main() -> None:
         mute=args.mute,
         force_spanish_reply=True,
     )
+
+    if args.telemetry:
+        assistant.skills.system_telemetry(lang="es")
+        return
+
+    if args.vision:
+        assistant.skills.analyze_screen(query=args.vision, mode=args.vision_mode, lang="es")
+        return
 
     if args.command:
         assistant.process_command(args.command)

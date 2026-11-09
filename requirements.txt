@@ -2,15 +2,19 @@
 pyttsx3>=2.90
 SpeechRecognition>=3.10.4
 
-# Paso 3: STT Offline de baja latencia
+# Pilar 3: STT Offline de baja latencia
 faster-whisper>=1.0.3
 
-# Paso 2: Wake-Word Detection (opcional, con fallback inteligente integrado)
+# Pilar 2: Wake-Word Detection (opcional, con fallback inteligente integrado)
 openwakeword>=0.6.0
 
-# Paso 1: Inteligencia Artificial Generativa (Gemini / Ollama REST)
+# Pilar 1 & 6: Inteligencia Artificial Generativa y Visión Multimodal (Gemini / Ollama)
 google-genai>=1.0.0
 requests>=2.31.0
+Pillow>=10.0.0
+
+# Pilar 5: Telemetría de Hardware y Procesos en Tiempo Real
+psutil>=5.9.8
 
 # Utilidades y Automatización de Escritorio
 wikipedia>=1.4.0
