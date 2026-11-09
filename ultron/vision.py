@@ -569,16 +569,25 @@ class UltronVision:
                 data=capture.image_bytes,
                 mime_type="image/png",
             )
-            response = client.models.generate_content(
-                model=self.config.gemini_model,
-                contents=[image_part, prompt],
-                config=types.GenerateContentConfig(
-                    temperature=0.4,
-                    max_output_tokens=500,
-                ),
-            )
-            if response and getattr(response, "text", None):
-                return response.text.strip()
+            models_to_try = [self.config.gemini_model, "gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
+            seen: set[str] = set()
+            unique_models = [m for m in models_to_try if m and not (m in seen or seen.add(m))]
+
+            for model_name in unique_models:
+                try:
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=[image_part, prompt],
+                        config=types.GenerateContentConfig(
+                            temperature=0.4,
+                            max_output_tokens=500,
+                        ),
+                    )
+                    if response and getattr(response, "text", None):
+                        return response.text.strip()
+                except Exception as model_err:
+                    logger.debug("Gemini vision model '%s' failed: %s", model_name, model_err)
+                    continue
         except Exception as exc:
             logger.warning("Error en análisis multimodal con Gemini: %s", exc)
         return None

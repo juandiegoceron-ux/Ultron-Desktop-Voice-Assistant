@@ -111,17 +111,26 @@ class UltronBrain:
                 from google.genai import types
 
                 client = genai.Client(api_key=self.config.gemini_api_key)
-                response = client.models.generate_content(
-                    model=self.config.gemini_model,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        system_instruction=system_prompt,
-                        temperature=temperature,
-                        max_output_tokens=max_tokens,
-                    ),
-                )
-                if response and response.text:
-                    return response.text.strip()
+                models_to_try = [self.config.gemini_model, "gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
+                seen: set[str] = set()
+                unique_models = [m for m in models_to_try if m and not (m in seen or seen.add(m))]
+
+                for model_name in unique_models:
+                    try:
+                        response = client.models.generate_content(
+                            model=model_name,
+                            contents=prompt,
+                            config=types.GenerateContentConfig(
+                                system_instruction=system_prompt,
+                                temperature=temperature,
+                                max_output_tokens=max_tokens,
+                            ),
+                        )
+                        if response and response.text:
+                            return response.text.strip()
+                    except Exception as model_err:
+                        logger.debug("Gemini generate_raw model '%s' failed: %s", model_name, model_err)
+                        continue
             except Exception as exc:
                 logger.debug("Gemini generate_raw failed: %s", exc)
 
@@ -165,17 +174,26 @@ class UltronBrain:
             from google.genai import types
 
             client = genai.Client(api_key=self.config.gemini_api_key)
-            response = client.models.generate_content(
-                model=self.config.gemini_model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_prompt,
-                    temperature=0.6,
-                    max_output_tokens=250,
-                ),
-            )
-            if response and response.text:
-                return response.text.strip()
+            models_to_try = [self.config.gemini_model, "gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
+            seen: set[str] = set()
+            unique_models = [m for m in models_to_try if m and not (m in seen or seen.add(m))]
+
+            for model_name in unique_models:
+                try:
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            system_instruction=system_prompt,
+                            temperature=0.6,
+                            max_output_tokens=250,
+                        ),
+                    )
+                    if response and response.text:
+                        return response.text.strip()
+                except Exception as model_err:
+                    logger.debug("Error con modelo Gemini '%s': %s", model_name, model_err)
+                    continue
         except Exception as exc:
             logger.warning("Error consultando Google Gemini: %s", exc)
         return None
