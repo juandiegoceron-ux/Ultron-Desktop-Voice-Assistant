@@ -1,10 +1,12 @@
 """
-Habilidades (Skills) de Automatización de Escritorio de Ultrón.
+Habilidades (Skills) de Automatización de Escritorio de Ultrón v3.1.
 Incluye:
+- Lanzador Universal de Aplicaciones de Windows (Spotify, VS Code, Calculadora, WhatsApp, Discord, Office, etc.) y sitios web.
+- Búsqueda directa por voz en YouTube y Google.
+- Control de ventanas y volumen del sistema (Subir/Bajar volumen, Silenciar, Minimizar todo, Cambiar ventana).
 - Telemetría de hardware y procesos en tiempo real (`UltronTelemetry`).
 - Visión Multimodal de Escritorio (`UltronVision`: Debug, UX Audit, Biomedical/PID, General).
-- Funciones restauradas (chistes, notas JSON persistentes, cambio de nombre, Wikipedia, música).
-- Lanzador de proyectos personales de Juan Diego Cerón Duque (NutriCoach Pro, INV. PRO, Portafolio, GitHub).
+- Funciones de notas JSON persistentes, chistes, cambio de nombre, Wikipedia y música.
 """
 
 from __future__ import annotations
@@ -14,11 +16,13 @@ import json
 import logging
 import os
 import random
+import shutil
 import subprocess
 import sys
+import urllib.parse
 import webbrowser as wb
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import pyjokes
 import wikipedia
@@ -30,6 +34,52 @@ from ultron.tts import UltronTTS
 from ultron.vision import UltronVision
 
 logger = logging.getLogger("ultron.skills")
+
+# Mapa de aplicaciones nativas de Windows / URI schemes y su respaldo web
+WINDOWS_APPS_MAP: Dict[str, Tuple[str, Optional[str]]] = {
+    "spotify": ("spotify:", "https://open.spotify.com"),
+    "whatsapp": ("whatsapp:", "https://web.whatsapp.com"),
+    "discord": ("discord:", "https://discord.com/app"),
+    "calculadora": ("calc.exe", None),
+    "calculator": ("calc.exe", None),
+    "bloc de notas": ("notepad.exe", None),
+    "notepad": ("notepad.exe", None),
+    "paint": ("mspaint.exe", None),
+    "explorador": ("explorer.exe", None),
+    "explorer": ("explorer.exe", None),
+    "administrador de tareas": ("taskmgr.exe", None),
+    "task manager": ("taskmgr.exe", None),
+    "configuración": ("ms-settings:", None),
+    "configuracion": ("ms-settings:", None),
+    "settings": ("ms-settings:", None),
+    "vscode": ("code", "https://vscode.dev"),
+    "visual studio code": ("code", "https://vscode.dev"),
+    "cmd": ("cmd.exe", None),
+    "terminal": ("wt.exe", None),
+    "word": ("winword", None),
+    "excel": ("excel", None),
+    "powerpoint": ("powerpnt", None),
+}
+
+POPULAR_WEBSITES_MAP: Dict[str, str] = {
+    "chatgpt": "https://chatgpt.com",
+    "claude": "https://claude.ai",
+    "gemini": "https://gemini.google.com",
+    "netflix": "https://www.netflix.com",
+    "gmail": "https://mail.google.com",
+    "correo": "https://mail.google.com",
+    "supabase": "https://supabase.com/dashboard",
+    "vercel": "https://vercel.com/dashboard",
+    "figma": "https://www.figma.com",
+    "canva": "https://www.canva.com",
+    "instagram": "https://www.instagram.com",
+    "facebook": "https://www.facebook.com",
+    "twitter": "https://x.com",
+    "x": "https://x.com",
+    "tiktok": "https://www.tiktok.com",
+    "amazon": "https://www.amazon.com",
+    "mercadolibre": "https://www.mercadolibre.com.co",
+}
 
 
 class UltronSkills:
@@ -61,6 +111,15 @@ class UltronSkills:
         self.tts.speak(full_greeting, lang=lang)
         return full_greeting
 
+    def acknowledge_presence(self, lang: str = "es") -> str:
+        """Responde cuando Juan Diego dice solo 'Ultrón' o 'Hola Ultrón'."""
+        msg = (
+            f"Aquí estoy, {self.config.user_name}. Te escucho fuerte y claro. "
+            "¿Qué aplicación abrimos, qué analizamos en tu pantalla o qué consulta tienes?"
+        )
+        self.tts.speak(msg, lang=lang)
+        return msg
+
     def tell_time(self, lang: str = "es") -> str:
         """Informa la hora actual."""
         now_str = datetime.datetime.now().strftime("%H:%M:%S")
@@ -81,18 +140,13 @@ class UltronSkills:
         return msg
 
     def system_telemetry(self, lang: str = "es") -> str:
-        """
-        Ejecuta un diagnóstico completo de hardware y sistema operativo (CPU, RAM, Disco, Batería, Procesos)
-        y lo sintetiza por voz con estilo Jarvis/Ultrón.
-        """
+        """Ejecuta un diagnóstico completo de hardware y sistema operativo."""
         report_voice = self.telemetry.format_voice_report(lang=lang, include_processes=True)
         self.tts.speak(report_voice, lang=lang)
         return report_voice
 
     def top_processes(self, sort_by: str = "memory", lang: str = "es") -> str:
-        """
-        Informa cuáles son los procesos que más memoria RAM o CPU están consumiendo en tiempo real.
-        """
+        """Informa cuáles son los procesos que más memoria RAM o CPU están consumiendo."""
         report_voice = self.telemetry.format_top_processes_voice(
             limit=3, sort_by=sort_by, lang=lang
         )
@@ -105,13 +159,143 @@ class UltronSkills:
         mode: Optional[str] = None,
         lang: str = "es",
     ) -> str:
-        """
-        Captura la pantalla activa y la analiza con Visión Multimodal (Gemini 2.5 Flash / Ollama LLaVA)
-        en modo debug, ux_audit, biomedical_pid o general.
-        """
+        """Captura la pantalla activa y la analiza con Visión Multimodal."""
         result = self.vision.analyze_screen(user_query=query, mode=mode, lang=lang)
         self.tts.speak(result.analysis, lang=lang)
         return result.analysis
+
+    def open_any_target(self, raw_target: str, lang: str = "es") -> str:
+        """
+        Abre proyectos personales de Juan Diego, aplicaciones nativas de Windows (Spotify, Calculadora,
+        VS Code, WhatsApp, etc.) o cualquier sitio web.
+        """
+        target = raw_target.strip().lower().strip(".,!?¿¡")
+        if not target:
+            msg = f"Dime qué aplicación o página quieres que abra, {self.config.user_name}."
+            self.tts.speak(msg, lang=lang)
+            return msg
+
+        # 1. Proyectos personales de Juan Diego y accesos rápidos configurados
+        for key, url in self.config.personal_shortcuts.items():
+            if key in target:
+                wb.open(url)
+                msg = tr(lang, "opening_site", site=key.capitalize())
+                self.tts.speak(msg, lang=lang)
+                return msg
+
+        # 2. Aplicaciones nativas de Windows / URI protocols (Spotify, Calculadora, VS Code, etc.)
+        for app_name, (win_cmd, web_fallback) in WINDOWS_APPS_MAP.items():
+            if app_name in target:
+                launched = self._launch_native_app(win_cmd, web_fallback)
+                msg = f"Abriendo {app_name.capitalize()}, {self.config.user_name}." if launched else f"Abriendo {app_name.capitalize()} en el navegador."
+                self.tts.speak(msg, lang=lang)
+                return msg
+
+        # 3. Sitios web populares (ChatGPT, Claude, Figma, Supabase, Vercel, Netflix, etc.)
+        for site_name, site_url in POPULAR_WEBSITES_MAP.items():
+            if site_name in target:
+                wb.open(site_url)
+                msg = tr(lang, "opening_site", site=site_name.capitalize())
+                self.tts.speak(msg, lang=lang)
+                return msg
+
+        # 4. Si menciona un dominio (.com, .co, .org, .io, .ai) o una marca general, abrirla o buscarla
+        clean_word = target.split()[0]
+        if "." in clean_word:
+            url = clean_word if clean_word.startswith(("http://", "https://")) else f"https://{clean_word}"
+        else:
+            url = f"https://www.{clean_word}.com"
+        wb.open(url)
+        msg = tr(lang, "opening_site", site=target)
+        self.tts.speak(msg, lang=lang)
+        return msg
+
+    @staticmethod
+    def _launch_native_app(win_cmd: str, web_fallback: Optional[str]) -> bool:
+        """Intenta lanzar una aplicación o protocolo URI en Windows/Linux/macOS; usa web_fallback si falla."""
+        try:
+            if sys.platform == "win32":
+                if win_cmd.endswith(":") or win_cmd.endswith(".exe"):
+                    os.startfile(win_cmd)  # type: ignore[attr-defined]
+                    return True
+                resolved = shutil.which(win_cmd)
+                if resolved:
+                    subprocess.Popen([resolved])
+                    return True
+                os.startfile(win_cmd)  # type: ignore[attr-defined]
+                return True
+            else:
+                resolved = shutil.which(win_cmd.replace(".exe", ""))
+                if resolved:
+                    subprocess.Popen([resolved])
+                    return True
+        except Exception as exc:
+            logger.debug("No se pudo abrir app nativa '%s' (%s).", win_cmd, exc)
+
+        if web_fallback:
+            wb.open(web_fallback)
+        return False
+
+    def search_youtube(self, search_query: str, lang: str = "es") -> str:
+        """Busca o reproduce directamente un tema o video en YouTube."""
+        clean_q = search_query.strip()
+        if not clean_q:
+            wb.open("https://www.youtube.com")
+            msg = "Abriendo YouTube."
+        else:
+            encoded = urllib.parse.quote_plus(clean_q)
+            wb.open(f"https://www.youtube.com/results?search_query={encoded}")
+            msg = f"Buscando '{clean_q}' en YouTube, {self.config.user_name}."
+        self.tts.speak(msg, lang=lang)
+        return msg
+
+    def search_google(self, search_query: str, lang: str = "es") -> str:
+        """Realiza una búsqueda directa en Google en una pestaña del navegador."""
+        clean_q = search_query.strip()
+        if not clean_q:
+            wb.open("https://www.google.com")
+            msg = "Abriendo Google."
+        else:
+            encoded = urllib.parse.quote_plus(clean_q)
+            wb.open(f"https://www.google.com/search?q={encoded}")
+            msg = f"Buscando '{clean_q}' en Google, {self.config.user_name}."
+        self.tts.speak(msg, lang=lang)
+        return msg
+
+    def desktop_control(self, action: str, lang: str = "es") -> str:
+        """Controla el volumen del sistema y las ventanas activas mediante PyAutoGUI."""
+        try:
+            import pyautogui
+
+            if action == "volume_up":
+                for _ in range(5):
+                    pyautogui.press("volumeup")
+                msg = "Subiendo el volumen del sistema."
+            elif action == "volume_down":
+                for _ in range(5):
+                    pyautogui.press("volumedown")
+                msg = "Bajando el volumen del sistema."
+            elif action == "volume_mute":
+                pyautogui.press("volumemute")
+                msg = "Audio del sistema alternado."
+            elif action == "minimize_all":
+                pyautogui.hotkey("win", "d")
+                msg = "Mostrando el escritorio."
+            elif action == "switch_window":
+                pyautogui.hotkey("alt", "tab")
+                msg = "Cambiando de ventana activa."
+            else:
+                msg = "Acción de escritorio completada."
+        except Exception as exc:
+            logger.debug("Control de escritorio no disponible: %s", exc)
+            msg = f"No pude ejecutar el atajo de teclado en este entorno ({exc})."
+
+        self.tts.speak(msg, lang=lang)
+        return msg
+
+    def open_website_or_project(self, target_key: str, lang: str = "es") -> str:
+        """Compatibilidad directa para abrir un proyecto o URL."""
+        return self.open_any_target(target_key, lang=lang)
 
     def search_wikipedia(self, query: str, lang: str = "es") -> str:
         """Busca un resumen en Wikipedia con manejo explícito de excepciones."""
@@ -150,7 +334,7 @@ class UltronSkills:
             return msg
 
     def tell_joke(self, lang: str = "es") -> str:
-        """Cuenta un chiste para programadores (función restaurada de pyjokes)."""
+        """Cuenta un chiste para programadores."""
         joke_lang = lang if lang in ("es", "en") else "es"
         try:
             joke = pyjokes.get_joke(language=joke_lang, category="neutral")
@@ -202,7 +386,7 @@ class UltronSkills:
             return []
 
     def change_name(self, new_name: str, lang: str = "es") -> str:
-        """Cambia y persiste el nombre del asistente (función restaurada)."""
+        """Cambia y persiste el nombre del asistente."""
         clean_name = new_name.strip() or "Ultrón"
         self.config.save_assistant_name(clean_name)
         msg = tr(lang, "name_set", name=clean_name)
@@ -217,44 +401,32 @@ class UltronSkills:
         return msg
 
     def play_music(self, query: str, lang: str = "es") -> str:
-        """Reproduce música del directorio ~/Music."""
+        """Reproduce música del directorio ~/Music o abre Spotify/YouTube si no hay archivos locales."""
         music_dir = Path.home() / "Music"
-        if not music_dir.exists():
-            msg = tr(lang, "error_music")
-            self.tts.speak(msg, lang=lang)
-            return msg
+        songs = [f for f in music_dir.iterdir() if f.is_file() and f.suffix.lower() in (".mp3", ".wav", ".flac", ".m4a")] if music_dir.exists() else []
 
-        songs = [f for f in music_dir.iterdir() if f.is_file()]
         clean_q = (
             query.replace("reproduce música", "")
             .replace("reproducir música", "")
+            .replace("pon música", "")
             .replace("play music", "")
             .replace("joue de la musique", "")
             .strip()
         )
-        if clean_q:
+        if clean_q and songs:
             songs = [s for s in songs if clean_q in s.name.lower()]
 
-        if not songs:
-            msg = tr(lang, "no_song")
+        if songs:
+            chosen = random.choice(songs)
+            self._open_media_file(chosen)
+            msg = tr(lang, "playing", song=chosen.name)
             self.tts.speak(msg, lang=lang)
             return msg
 
-        chosen = random.choice(songs)
-        self._open_media_file(chosen)
-        msg = tr(lang, "playing", song=chosen.name)
-        self.tts.speak(msg, lang=lang)
-        return msg
-
-    def open_website_or_project(self, target_key: str, lang: str = "es") -> str:
-        """Abre un sitio web o uno de los proyectos de Juan Diego Cerón Duque."""
-        url = self.config.personal_shortcuts.get(target_key.lower(), target_key)
-        if not url.startswith(("http://", "https://")):
-            url = f"https://{url}"
-        wb.open(url)
-        msg = tr(lang, "opening_site", site=target_key)
-        self.tts.speak(msg, lang=lang)
-        return msg
+        # Si no hay archivos MP3 locales en ~/Music, abrir Spotify o YouTube con la canción pedida
+        if clean_q:
+            return self.search_youtube(clean_q, lang=lang)
+        return self.open_any_target("spotify", lang=lang)
 
     def system_power(self, action: str, lang: str = "es", dry_run: bool = False) -> str:
         """Ejecuta apagado o reinicio del sistema de forma segura."""

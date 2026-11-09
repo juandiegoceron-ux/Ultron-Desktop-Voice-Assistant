@@ -1,17 +1,17 @@
 """
-Orquestador Principal de Ultrón (`UltronAssistant` v3.0).
-Integra los 6 pilares de ingeniería:
-1. IA Generativa (Gemini / Ollama) con respuesta siempre en Español cuando Juan Diego practica Inglés.
-2. Detección de Wake-Word ("Ultrón" / "Hey Ultrón").
-3. Reconocimiento de voz offline con `faster-whisper` y fallback híbrido.
-4. Enrutador modular de habilidades y accesos directos de Juan Diego Cerón Duque.
-5. Telemetría y Diagnóstico del Sistema en Tiempo Real (`psutil`: CPU, RAM, Disco, Batería, Top Procesos).
-6. Visión Multimodal de Escritorio (`Gemini Vision` / `Ollama LLaVA`: Debug, Auditoría UX/UI, Control PID / Biomédica).
+Orquestador Principal de Ultrón (`UltronAssistant` v3.1).
+Integra:
+1. Limpieza automática del prefijo "Ultrón" / "Hey Ultrón" incluso en modo `--no-wake`.
+2. Lanzador universal de aplicaciones de Windows (`Spotify`, `VS Code`, `Calculadora`, `WhatsApp`, `Discord`, etc.) y proyectos de Juan Diego.
+3. Búsqueda directa en YouTube y Google, y control de volumen/ventanas de Windows.
+4. Telemetría en tiempo real y Visión Multimodal de Escritorio.
+5. Cerebro de IA Generativa con 3 niveles (Gemini API -> Ollama -> Cloud IA Gratuito Zero-Config).
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from typing import Optional
 
 from ultron.config import UltronConfig
@@ -26,7 +26,7 @@ logger = logging.getLogger("ultron.assistant")
 
 
 class UltronAssistant:
-    """Núcleo operativo de Ultrón v3.0."""
+    """Núcleo operativo de Ultrón v3.1."""
 
     def __init__(
         self,
@@ -56,17 +56,48 @@ class UltronAssistant:
             return "es"
         return detected_lang
 
+    def _strip_wake_prefix(self, text: str) -> str:
+        """
+        Elimina invocaciones como 'ultrón', 'hey ultrón', 'oye ultrón' al inicio de la frase
+        incluso cuando se ejecuta con `--no-wake`.
+        """
+        cleaned = text.strip()
+        pattern = r"^\s*(?:hey\s+|oye\s+|hola\s+)?(?:ultr[oó]n|mult[oó]n)\b[\s,.:;!?-]*(.*)$"
+        match = re.match(pattern, cleaned, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+        return cleaned
+
     def process_command(self, raw_query: str, detected_lang: Optional[str] = None) -> str:
         """
         Enruta una orden (en español, inglés o francés) hacia la habilidad correspondiente
-        (incluyendo Telemetría de Sistema y Visión Multimodal) o hacia el cerebro generativo (LLM).
+        o hacia el cerebro generativo (LLM).
         """
-        query = raw_query.strip().lower()
-        in_lang = detected_lang or detect_language(query, default_lang=self.config.default_lang)
+        stripped = self._strip_wake_prefix(raw_query)
+        query = stripped.lower().strip("¿?¡!., ")
+        in_lang = detected_lang or detect_language(raw_query, default_lang=self.config.default_lang)
         out_lang = self.reply_lang(in_lang)
 
+        # 0. Si el usuario solo dijo "Ultrón", "Hola Ultrón" o "¿Me escuchas?"
+        if not query or query in (
+            "hola",
+            "hello",
+            "hi",
+            "hey",
+            "buenas",
+            "buenos días",
+            "buenas tardes",
+            "buenas noches",
+            "me escuchas",
+            "estás ahí",
+            "estas ahi",
+            "are you there",
+            "can you hear me",
+        ):
+            return self.skills.acknowledge_presence(lang=out_lang)
+
         # 1. Salida / Modo offline
-        if any(w in query for w in ("salir", "desconectar", "offline", "exit", "repos", "apágate")):
+        if query in ("salir", "desconectar", "offline", "exit", "repos", "apágate", "apagate", "hasta luego"):
             msg = tr(out_lang, "offline", user=self.config.user_name)
             self.tts.speak(msg, lang=out_lang)
             return "EXIT"
@@ -87,14 +118,12 @@ class UltronAssistant:
             "what is on my screen",
             "what's on my screen",
             "debug my screen",
-            "debug this error on screen",
-            "audit the ux on screen",
+            "debug this error",
+            "audit the ux",
             "analyze this pid",
-            "vision",
-            "visión",
         )
         if any(trigger in query for trigger in vision_triggers):
-            return self.skills.analyze_screen(query=raw_query, lang=out_lang)
+            return self.skills.analyze_screen(query=stripped, lang=out_lang)
 
         # 3. Telemetría: Top Procesos devoradores de RAM o CPU (Opción B)
         top_proc_triggers = (
@@ -120,10 +149,12 @@ class UltronAssistant:
             "estado del sistema",
             "diagnóstico del sistema",
             "diagnostico del sistema",
+            "diagnóstico",
             "telemetría",
             "telemetria",
             "cómo está mi pc",
             "como esta mi pc",
+            "cómo va mi pc",
             "uso de cpu",
             "uso de ram",
             "cuánta ram",
@@ -142,30 +173,59 @@ class UltronAssistant:
         if any(trigger in query for trigger in telemetry_triggers):
             return self.skills.system_telemetry(lang=out_lang)
 
-        # 5. Hora
-        if any(w in query for w in ("qué hora", "que hora", "dime la hora", "what time", "current time", "heure")):
+        # 5. Control de Volumen y Ventanas del Escritorio
+        if any(w in query for w in ("sube el volumen", "subir volumen", "volume up", "louder")):
+            return self.skills.desktop_control("volume_up", lang=out_lang)
+        if any(w in query for w in ("baja el volumen", "bajar volumen", "volume down", "quieter")):
+            return self.skills.desktop_control("volume_down", lang=out_lang)
+        if any(w in query for w in ("silencia", "mute", "quitar sonido")):
+            return self.skills.desktop_control("volume_mute", lang=out_lang)
+        if any(w in query for w in ("minimiza todo", "muestra el escritorio", "minimize all", "show desktop")):
+            return self.skills.desktop_control("minimize_all", lang=out_lang)
+        if any(w in query for w in ("cambia de ventana", "cambiar ventana", "switch window")):
+            return self.skills.desktop_control("switch_window", lang=out_lang)
+
+        # 6. Hora
+        if any(w in query for w in ("qué hora", "que hora", "dime la hora", "la hora", "what time", "current time", "heure")):
             return self.skills.tell_time(lang=out_lang)
 
-        # 6. Fecha
-        if any(w in query for w in ("qué fecha", "que fecha", "qué día es hoy", "what date", "today's date", "date")):
+        # 7. Fecha
+        if any(w in query for w in ("qué fecha", "que fecha", "qué día es hoy", "que dia es hoy", "what date", "today's date", "what day is today")):
             return self.skills.tell_date(lang=out_lang)
 
-        # 7. Proyectos personales de Juan Diego y sitios web
-        for shortcut_key in self.config.personal_shortcuts:
-            if shortcut_key in query and any(
-                verb in query for verb in ("abre", "abrir", "open", "ouvre", "muéstrame", "show", "ir a")
-            ):
-                return self.skills.open_website_or_project(shortcut_key, lang=out_lang)
+        # 8. Búsquedas directas en YouTube y Google
+        yt_match = re.match(
+            r"^(?:busca\s+en\s+youtube|buscar\s+en\s+youtube|pon\s+en\s+youtube|reproduce\s+en\s+youtube|search\s+on\s+youtube|play\s+on\s+youtube)\s+(.+)$",
+            query,
+        )
+        if yt_match:
+            return self.skills.search_youtube(yt_match.group(1), lang=out_lang)
 
-        # 8. Wikipedia
+        google_match = re.match(
+            r"^(?:busca\s+en\s+google|buscar\s+en\s+google|googlea|search\s+on\s+google|google)\s+(.+)$",
+            query,
+        )
+        if google_match:
+            return self.skills.search_google(google_match.group(1), lang=out_lang)
+
+        # 9. Lanzador Universal: "abre <app/sitio/proyecto>" o "open <app/sitio/proyecto>"
+        open_match = re.match(
+            r"^(?:abre|abrir|ábreme|abreme|ejecuta|lanza|open|launch|start|ouvre)\s+(?:el\s+|la\s+|mi\s+|my\s+|the\s+)?(.+)$",
+            query,
+        )
+        if open_match:
+            target_to_open = open_match.group(1).strip()
+            return self.skills.open_any_target(target_to_open, lang=out_lang)
+
+        # 10. Wikipedia
         if "wikipedia" in query:
             return self.skills.search_wikipedia(query, lang=out_lang)
 
-        # 9. Chistes
+        # 11. Chistes
         if any(w in query for w in ("chiste", "joke", "blague", "hazme reír", "tell me a joke")):
             return self.skills.tell_joke(lang=out_lang)
 
-        # 10. Notas persistentes
+        # 12. Notas persistentes
         if any(
             w in query
             for w in ("lee mis notas", "leer notas", "mis notas", "read my notes", "show notes", "list notes")
@@ -189,7 +249,7 @@ class UltronAssistant:
             if note_body:
                 return self.skills.save_note(note_body, lang=out_lang)
 
-        # 11. Cambio de nombre del asistente
+        # 13. Cambio de nombre del asistente
         if any(
             w in query
             for w in ("cambia tu nombre a", "cambiar nombre a", "change your name to", "llámate")
@@ -200,24 +260,24 @@ class UltronAssistant:
                     if new_name:
                         return self.skills.change_name(new_name.title(), lang=out_lang)
 
-        # 12. Captura de pantalla simple
+        # 14. Captura de pantalla simple
         if any(w in query for w in ("captura", "screenshot", "pantallazo", "capture")):
             return self.skills.take_screenshot(lang=out_lang)
 
-        # 13. Música
-        if any(w in query for w in ("música", "musica", "music", "musique")):
+        # 15. Música
+        if any(w in query for w in ("música", "musica", "music", "musique", "spotify")):
             return self.skills.play_music(query, lang=out_lang)
 
-        # 14. Control de energía del sistema
+        # 16. Control de energía del sistema
         if any(w in query for w in ("apagar sistema", "shutdown system", "extinction")):
             return self.skills.system_power("shutdown", lang=out_lang)
 
         if any(w in query for w in ("reiniciar sistema", "restart system", "redémarrage")):
             return self.skills.system_power("restart", lang=out_lang)
 
-        # 15. Cerebro de IA Generativa (Gemini / Ollama) para conversación libre y práctica de inglés
+        # 17. Cerebro de IA Generativa (Gemini -> Ollama -> Cloud IA Gratuito)
         answer = self.brain.ask(
-            prompt=raw_query,
+            prompt=stripped,
             input_lang=in_lang,
             force_spanish_reply=self.force_spanish_reply,
         )

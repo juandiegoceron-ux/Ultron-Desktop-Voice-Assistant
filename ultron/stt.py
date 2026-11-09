@@ -123,12 +123,15 @@ class UltronSTT:
 
         # Modo 1 (Híbrido inteligente): Reconocimiento de alta precisión (es-CO / en-US) sin consumir RAM
         if self.config.stt_engine != "whisper_offline":
-            result = self._transcribe_with_google(recognizer, audio, target_lang)
+            result, is_offline = self._transcribe_with_google(recognizer, audio, target_lang)
             if result:
                 print(f"🗣️ [{self.config.user_name} | {result.language.upper()}]: {result.text}")
                 return result
+            if not is_offline:
+                # Hubo silencio o ruido ambiente, pero sí hay conexión: volver a escuchar sin cargar Whisper
+                return None
 
-        # Modo 2 (Offline faster-whisper a 16kHz o fallback automático si no hay internet)
+        # Modo 2 (Offline faster-whisper a 16kHz cuando no hay internet o se forzó whisper_offline)
         if not self._whisper_attempted:
             self._whisper_attempted = True
             self._init_whisper()
@@ -139,7 +142,6 @@ class UltronSTT:
                 print(f"🗣️ [{self.config.user_name} | {result.language.upper()}]: {result.text}")
                 return result
 
-        print("⚠️ No alcancé a entender con claridad. Intenta hablar un poco más cerca del micrófono.")
         return None
 
     def _transcribe_with_whisper(
@@ -153,11 +155,28 @@ class UltronSTT:
                 wav_stream,
                 beam_size=5,
                 vad_filter=True,
+                condition_on_previous_text=False,
+                no_speech_threshold=0.6,
                 initial_prompt=ULTRON_WHISPER_PROMPT,
             )
-            text = " ".join(seg.text.strip() for seg in segments).strip()
+            valid_texts = [
+                seg.text.strip()
+                for seg in segments
+                if getattr(seg, "no_speech_prob", 0.0) < 0.6
+            ]
+            text = " ".join(valid_texts).strip()
 
-            if not text:
+            # Filtrar alucinaciones típicas de Whisper ante el silencio
+            hallucinations = {
+                "we don't know.",
+                "we don't know",
+                "thank you.",
+                "thank you",
+                "you",
+                "gracias.",
+                "subtítulos realizados por la comunidad de amara.org",
+            }
+            if not text or text.lower() in hallucinations:
                 return None
 
             lang_code = getattr(info, "language", default_lang) or default_lang
@@ -175,7 +194,8 @@ class UltronSTT:
 
     def _transcribe_with_google(
         self, recognizer: object, audio: object, default_lang: str
-    ) -> Optional[TranscriptionResult]:
+    ) -> tuple[Optional[TranscriptionResult], bool]:
+        """Retorna `(TranscriptionResult | None, is_offline: bool)`."""
         import speech_recognition as sr
 
         lang_BCP47 = {
@@ -193,14 +213,17 @@ class UltronSTT:
                 query = recognizer.recognize_google(audio, language=bcp)  # type: ignore[attr-defined]
                 if query:
                     detected = detect_language(query, default_lang=code)
-                    return TranscriptionResult(
-                        text=query.lower(),
-                        language=detected,
-                        engine=f"google ({bcp})",
+                    return (
+                        TranscriptionResult(
+                            text=query.lower(),
+                            language=detected,
+                            engine=f"google ({bcp})",
+                        ),
+                        False,
                     )
             except sr.UnknownValueError:
                 continue
             except sr.RequestError as exc:
                 logger.debug("Google Speech API sin conexión: %s", exc)
-                break
-        return None
+                return None, True
+        return None, False

@@ -97,9 +97,16 @@ class TestUltronAssistant(unittest.TestCase):
     def test_multimodal_vision_voice_routing(self) -> None:
         resp = self.assistant.process_command("Look at my screen and debug this error")
         self.assertTrue(len(resp) > 20)
-        # Verifica que la captura se haya guardado en el directorio de screenshots
         saved_pngs = list(self.config.screenshots_dir.glob("*.png"))
         self.assertGreaterEqual(len(saved_pngs), 1)
+
+    def test_ultron_prefix_strip_and_spotify_launch(self) -> None:
+        resp = self.assistant.process_command("ultron abre spotify")
+        self.assertIn("Spotify", resp)
+
+    def test_ultron_bare_name_acknowledgement(self) -> None:
+        resp = self.assistant.process_command("ultron")
+        self.assertIn("Te escucho fuerte y claro", resp)
 
 
 if __name__ == "__main__":

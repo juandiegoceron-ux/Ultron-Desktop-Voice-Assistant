@@ -1,7 +1,9 @@
 """
-Cerebro de IA Generativa de Ultrón (Paso 1 de la hoja de ruta).
-Soporta Google Gemini (`google-genai`) y modelos locales vía Ollama (`http://localhost:11434`),
-con un System Prompt personalizado para Juan Diego Cerón Duque.
+Cerebro de IA Generativa de Ultrón (3 Niveles de Respaldo Inteligente):
+1. Google Gemini (`google-genai`) si `GEMINI_API_KEY` está configurada.
+2. Ollama Local (`http://localhost:11434`) si está corriendo en la máquina.
+3. Motor Cloud IA Gratuito Zero-Config (`Pollinations AI`) para que Ultrón tenga
+   inteligencia conversacional completa desde el primer segundo sin requerir API Keys.
 """
 
 from __future__ import annotations
@@ -34,39 +36,53 @@ def build_system_prompt(config: UltronConfig, response_lang: str = "es") -> str:
         "- Especialista en React, TypeScript, Three.js/WebGL, Flutter, Supabase, PostgreSQL y sistemas de control PID en Arduino.\n"
         "- Creador de proyectos de alto impacto como NutriCoach Pro, Inventario Web Pro (INV. PRO) y controladores PID Bola-Viga.\n"
         "- Filosofía de trabajo: 'El buen diseño es invisible; el buen código también.'\n"
-        "- Juan Diego suele hablarte en inglés para practicar su fluidez; comprende perfectamente su inglés, "
-        "y si notas una oportunidad breve y amigable de mejora gramatical en su frase en inglés, puedes dársela en una línea corta "
-        "después de responder a su consulta en español.\n"
+        "- Tienes personalidad estilo Jarvis/Ultrón: leal, brillante, directo, ingenioso y enfocado en ingeniería de primer nivel.\n"
+        "- Si Juan Diego te habla en inglés para practicar su fluidez, entiéndelo perfectamente, responde a su consulta en español "
+        "y añade al final un breve tip si hubo algún detalle gramatical por pulir.\n"
         f"{lang_instruction}\n"
-        "Mantén tus respuestas breves (máximo 2-3 oraciones) porque serán leídas en voz alta por un motor Text-to-Speech."
+        "IMPORTANTE: Mantén tus respuestas breves (máximo 2 a 3 oraciones fluidas, sin bloques largos de markdown ni asteriscos) "
+        "porque serán leídas en voz alta por el altavoz de su computadora."
     )
 
 
 class UltronBrain:
-    """Cliente unificado de IA Generativa (Gemini API + Ollama Local)."""
+    """Cliente unificado de IA Generativa (Gemini API + Ollama Local + Zero-Config Cloud Fallback)."""
 
     def __init__(self, config: UltronConfig) -> None:
         self.config = config
 
     def ask(self, prompt: str, input_lang: str = "es", force_spanish_reply: bool = True) -> str:
         """
-        Envía una consulta abierta al LLM configurado (Gemini u Ollama).
+        Envía una consulta abierta al LLM disponible.
         Por preferencia de Juan Diego, responde en español incluso cuando él practica en inglés.
         """
         reply_lang = "es" if force_spanish_reply else input_lang
         system_prompt = build_system_prompt(self.config, response_lang=reply_lang)
 
+        # 1. Intentar con Google Gemini si el usuario configuró su GEMINI_API_KEY real
         if self.config.llm_provider == "gemini" and self.config.gemini_api_key:
             reply = self._ask_gemini(prompt, system_prompt)
             if reply:
-                return reply
+                return self._clean_for_tts(reply)
 
+        # 2. Intentar con Ollama local si está activo en localhost:11434
         if self.config.llm_provider == "ollama" or not self.config.gemini_api_key:
             reply = self._ask_ollama(prompt, system_prompt)
             if reply:
-                return reply
+                return self._clean_for_tts(reply)
+
+        # 3. Motor Cloud IA Gratuito Zero-Config (no requiere API key en .env)
+        reply = self._ask_free_cloud_llm(prompt, system_prompt)
+        if reply:
+            return self._clean_for_tts(reply)
 
         return tr(reply_lang, "llm_fallback_unavailable")
+
+    @staticmethod
+    def _clean_for_tts(text: str) -> str:
+        """Limpia símbolos de markdown (`**`, `#`, backticks) para que la voz de Windows lea con naturalidad."""
+        cleaned = text.replace("**", "").replace("__", "").replace("`", "").replace("###", "").replace("##", "")
+        return " ".join(cleaned.split()).strip()
 
     def _ask_gemini(self, prompt: str, system_prompt: str) -> Optional[str]:
         try:
@@ -98,7 +114,7 @@ class UltronBrain:
                 "prompt": prompt,
                 "stream": False,
             }
-            resp = requests.post(url, json=payload, timeout=15)
+            resp = requests.post(url, json=payload, timeout=4)
             if resp.status_code == 200:
                 data = resp.json()
                 answer = data.get("response", "").strip()
@@ -106,4 +122,34 @@ class UltronBrain:
                     return answer
         except requests.RequestException as exc:
             logger.debug("Ollama local no accesible (%s).", exc)
+        return None
+
+    def _ask_free_cloud_llm(self, prompt: str, system_prompt: str) -> Optional[str]:
+        """
+        Motor LLM gratuito sin configuración (Pollinations OpenAI-compatible API)
+        para garantizar respuestas inteligentes incluso sin GEMINI_API_KEY.
+        """
+        try:
+            payload = {
+                "model": "openai",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.6,
+            }
+            resp = requests.post(
+                "https://text.pollinations.ai/openai",
+                json=payload,
+                timeout=12,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                choices = data.get("choices") or []
+                if choices:
+                    content = choices[0].get("message", {}).get("content", "").strip()
+                    if content:
+                        return content
+        except Exception as exc:
+            logger.debug("Fallo en motor cloud gratuito: %s", exc)
         return None
