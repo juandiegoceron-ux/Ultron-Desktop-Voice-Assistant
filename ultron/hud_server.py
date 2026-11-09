@@ -42,6 +42,7 @@ STATIC_ROUTES: Dict[str, tuple[str, str]] = {
     "/index.html": ("index.html", "text/html; charset=utf-8"),
     "/styles.css": ("styles.css", "text/css; charset=utf-8"),
     "/app.js": ("app.js", "application/javascript; charset=utf-8"),
+    "/favicon.ico": ("favicon.ico", "image/x-icon"),
 }
 
 

@@ -125,10 +125,26 @@ cp .env.example .env
 # Añade tu GEMINI_API_KEY en .env (o usa Ollama local con llama3.2 y llava)
 ```
 
+### 🚀 Inicio Rápido a 1-Clic en Windows 11 / 10
+
+Ultrón incluye lanzadores listos para ejecutarse como una aplicación nativa de escritorio:
+
+1. **Instalar el Acceso Directo en el Escritorio:**
+   * Haz doble clic sobre `Instalar_Acceso_Directo.bat`.
+   * Se creará automáticamente en tu Escritorio de Windows el icono oficial con el Arc Reactor cian (`ultron.ico`) y el atajo global de teclado:
+     * **Atajo global:** <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>U</kbd> (inicia a Ultrón desde cualquier ventana o aplicación).
+2. **Lanzadores incluidos:**
+   * `Iniciar_Ultron.bat`: Inicia Ultrón mostrando la terminal con logs y el Stark HUD en modo aplicación.
+   * `Iniciar_Ultron_Silencioso.vbs`: Inicia Ultrón de manera 100% silenciosa en segundo plano (sin ventana negra de CMD).
+   * `Detener_Ultron.bat`: Finaliza cualquier proceso activo de Ultrón en segundo plano con un solo clic.
+
 ### Comandos rápidos desde la terminal
 
 ```bash
-# Iniciar Ultrón en modo voz completo
+# Iniciar Ultrón en modo HUD espacial interactivo
+python main.py --hud
+
+# Iniciar Ultrón en modo voz completo (consola tradicional)
 python main.py
 
 # Ejecutar diagnóstico de telemetría instantáneo
@@ -137,7 +153,7 @@ python main.py --telemetry
 # Analizar tu pantalla con Visión Multimodal desde la terminal
 python main.py --vision "Look at my screen and debug this error" --vision-mode debug
 
-# Ejecutar toda la batería de pruebas automatizadas (22 tests)
+# Ejecutar toda la batería de pruebas automatizadas (42 tests)
 python -m unittest discover -s tests -v
 ```
 
