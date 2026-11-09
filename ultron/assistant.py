@@ -383,11 +383,51 @@ class UltronAssistant:
         ) or query in ("pid", "el pid"):
             return self.skills.explain_pid(lang=out_lang)
 
-        # 8. Búsquedas o reproducción en Spotify ("reproduce a ryan castro en spotify", "pon ... en spotify", "busca en spotify...")
-        if "spotify" in query and any(
-            v in query for v in ("reproduce", "reproducir", "pon", "poner", "busca", "buscar", "escuchar", "play", "search")
-        ):
-            return self.skills.search_spotify(query, lang=out_lang)
+        # 7.8 Controles multimedia universales del sistema (Pausa, Reanudar, Siguiente, Anterior, Volumen)
+        if any(w in query for w in (
+            "pausa la música", "pausar la música", "pausa la musica", "pausar la musica",
+            "pausa música", "pausar musica", "pausa spotify", "para la música", "para la musica",
+            "detén la música", "deten la musica", "pause music", "stop music",
+        )) or query in ("pausa", "pausar", "pause"):
+            return self.skills.pause_media(lang=out_lang)
+
+        if any(w in query for w in (
+            "reanuda la música", "reanudar la música", "reanuda la musica", "reanudar la musica",
+            "continúa la música", "continua la musica", "resume music",
+        )) or query in ("reanudar", "reanuda", "resume"):
+            return self.skills.resume_media(lang=out_lang)
+
+        if any(w in query for w in (
+            "siguiente canción", "siguiente cancion", "pasa la canción", "pasa la cancion",
+            "pasa de canción", "pasa de cancion", "cambia la canción", "cambia la cancion",
+            "cambia de canción", "cambia de cancion", "next song", "next track", "skip",
+        )) or query in ("siguiente", "next", "skip"):
+            return self.skills.next_track(lang=out_lang)
+
+        if any(w in query for w in (
+            "canción anterior", "cancion anterior", "anterior canción", "anterior cancion",
+            "canción previa", "cancion previa", "prev track", "previous track",
+        )) or query in ("anterior", "previous"):
+            return self.skills.prev_track(lang=out_lang)
+
+        if any(w in query for w in (
+            "sube el volumen", "aumenta el volumen", "más volumen", "mas volumen", "subir volumen", "volume up",
+        )):
+            return self.skills.media_volume_up(lang=out_lang)
+
+        if any(w in query for w in (
+            "baja el volumen", "disminuye el volumen", "menos volumen", "bajar volumen", "volume down",
+        )):
+            return self.skills.media_volume_down(lang=out_lang)
+
+        # 8. Spotify y Reproducción Musical Directa
+        # "abre spotify y reproduce música", "reproduce música en spotify", "pon música en spotify", "pon música", "reproduce a ryan castro en spotify"
+        is_bare_spotify_open = query in ("abre spotify", "abrir spotify", "open spotify", "spotify")
+        is_music_word = any(w in query for w in ("música", "musica", "music", "canción", "cancion", "playlist", "temas"))
+        has_play_verb = any(w in query for w in ("reproduce", "reproducir", "pon", "poner", "play", "dale play", "toca", "tocar", "escuchar", "escucha"))
+
+        if not is_bare_spotify_open and ("spotify" in query or (is_music_word and has_play_verb)):
+            return self.skills.play_spotify_music(query, lang=out_lang)
 
         # 8.5 Búsquedas directas o compuestas en YouTube ("abre youtube y busca música", "busca en youtube...", "pon en youtube...")
         if "youtube" in query:

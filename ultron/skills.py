@@ -16,9 +16,12 @@ import json
 import logging
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
+import threading
+import time
 import urllib.parse
 import webbrowser as wb
 from pathlib import Path
@@ -249,29 +252,149 @@ class UltronSkills:
             wb.open(web_fallback)
         return False
 
+    @staticmethod
+    def _send_multimedia_key(vk_code: int, key_name: str) -> bool:
+        """
+        Envía un comando multimedia global al sistema operativo (Windows/Linux/macOS).
+        Controla Spotify, YouTube y reproductores del sistema sin requerir foco en la ventana.
+        """
+        if sys.platform == "win32":
+            try:
+                import ctypes
+
+                ctypes.windll.user32.keybd_event(vk_code, 0, 0, 0)
+                time.sleep(0.04)
+                ctypes.windll.user32.keybd_event(vk_code, 0, 2, 0)
+                return True
+            except Exception as exc:
+                logger.debug("ctypes keybd_event(0x%X) fallo: %s", vk_code, exc)
+
+        try:
+            import pyautogui
+
+            pyautogui.press(key_name)
+            return True
+        except Exception as exc:
+            logger.debug("pyautogui.press('%s') fallo: %s", key_name, exc)
+
+        return False
+
+    def play_spotify_music(self, query: str = "", lang: str = "es") -> str:
+        """
+        Inicia la reproducción directa en Spotify.
+        Abre la app nativa en Windows y envía la señal Play en segundo plano.
+        Si la consulta incluye un término específico (artista o canción), lo busca y reproduce.
+        """
+        clean_q = re.sub(
+            r"(?i)\b(?:abre|abrir|ábreme|abreme|en|on|spotify|y|reproduce|reproducir|pon|poner|escuchar|escucha|toca|tocar|play|search|busca|buscar|musica|música|canción|cancion|canciones|un|una|algo|de|a|al)\b",
+            " ",
+            query or "",
+        ).strip()
+
+        if clean_q:
+            return self.search_spotify(clean_q, lang=lang)
+
+        # 1. Abrir app nativa de Spotify en Windows
+        opened_native = False
+        if sys.platform == "win32":
+            try:
+                os.startfile("spotify:")
+                opened_native = True
+            except Exception as exc:
+                logger.debug("No se pudo iniciar protocolo spotify: (%s)", exc)
+
+        if not opened_native:
+            self.open_any_target("spotify", lang=lang)
+
+        # 2. Enviar señal multimedia Play en segundo plano tras 1.2 segundos para que Spotify arranque y suene
+        def _delayed_play() -> None:
+            time.sleep(1.2)
+            self._send_multimedia_key(0xB3, "playpause")
+
+        threading.Thread(target=_delayed_play, daemon=True).start()
+
+        msg = f"Abriendo Spotify e iniciando reproducción musical, {self.config.user_name}."
+        self.tts.speak(msg, lang=lang)
+        return msg
+
     def search_spotify(self, search_query: str, lang: str = "es") -> str:
-        """Busca un artista, canción o playlist directamente en Spotify."""
-        clean_q = (
-            search_query.replace("en spotify", "")
-            .replace("on spotify", "")
-            .replace("spotify", "")
-            .replace("reproduce a", "")
-            .replace("reproduce", "")
-            .replace("reproducir", "")
-            .replace("pon a", "")
-            .replace("pon", "")
-            .replace("escuchar", "")
-            .replace("busca", "")
-            .replace("buscar", "")
-            .replace("play", "")
-            .strip()
-        )
+        """Busca un artista, canción o playlist y lo reproduce en Spotify."""
+        clean_q = re.sub(
+            r"(?i)\b(?:abre|abrir|ábreme|abreme|en|on|spotify|y|reproduce|reproducir|pon|poner|escuchar|escucha|toca|tocar|play|search|busca|buscar|musica|música|canción|cancion|canciones|un|una|algo|de|a|al)\b",
+            " ",
+            search_query or "",
+        ).strip()
+
         if not clean_q:
-            return self.open_any_target("spotify", lang=lang)
+            return self.play_spotify_music("", lang=lang)
 
         encoded = urllib.parse.quote(clean_q)
-        wb.open(f"https://open.spotify.com/search/{encoded}")
+        opened_native = False
+        if sys.platform == "win32":
+            try:
+                os.startfile(f"spotify:search:{encoded}")
+                opened_native = True
+            except Exception as exc:
+                logger.debug("No se pudo abrir spotify:search URI: %s", exc)
+
+        if not opened_native:
+            wb.open(f"https://open.spotify.com/search/{encoded}")
+
+        # Enviar play / enter tras 1.4s si abrió nativo
+        def _delayed_play_search() -> None:
+            time.sleep(1.4)
+            if opened_native:
+                self._send_multimedia_key(0xB3, "playpause")
+
+        threading.Thread(target=_delayed_play_search, daemon=True).start()
+
         msg = f"Buscando '{clean_q}' en Spotify, {self.config.user_name}."
+        self.tts.speak(msg, lang=lang)
+        return msg
+
+    def pause_media(self, lang: str = "es") -> str:
+        """Pausa la música o medio activo en el sistema."""
+        self._send_multimedia_key(0xB3, "playpause")
+        msg = f"Música pausada, {self.config.user_name}."
+        self.tts.speak(msg, lang=lang)
+        return msg
+
+    def resume_media(self, lang: str = "es") -> str:
+        """Reanuda la reproducción multimedia activa."""
+        self._send_multimedia_key(0xB3, "playpause")
+        msg = f"Reanudando música, {self.config.user_name}."
+        self.tts.speak(msg, lang=lang)
+        return msg
+
+    def next_track(self, lang: str = "es") -> str:
+        """Avanza a la siguiente pista o canción."""
+        self._send_multimedia_key(0xB0, "nexttrack")
+        msg = f"Pasando a la siguiente canción, {self.config.user_name}."
+        self.tts.speak(msg, lang=lang)
+        return msg
+
+    def prev_track(self, lang: str = "es") -> str:
+        """Retrocede a la pista o canción anterior."""
+        self._send_multimedia_key(0xB1, "prevtrack")
+        msg = f"Volviendo a la canción anterior, {self.config.user_name}."
+        self.tts.speak(msg, lang=lang)
+        return msg
+
+    def media_volume_up(self, lang: str = "es") -> str:
+        """Sube el volumen multimedia del sistema."""
+        for _ in range(3):
+            self._send_multimedia_key(0xAF, "volumeup")
+            time.sleep(0.02)
+        msg = f"Subiendo volumen, {self.config.user_name}."
+        self.tts.speak(msg, lang=lang)
+        return msg
+
+    def media_volume_down(self, lang: str = "es") -> str:
+        """Baja el volumen multimedia del sistema."""
+        for _ in range(3):
+            self._send_multimedia_key(0xAE, "volumedown")
+            time.sleep(0.02)
+        msg = f"Bajando volumen, {self.config.user_name}."
         self.tts.speak(msg, lang=lang)
         return msg
 
@@ -312,22 +435,21 @@ class UltronSkills:
         return msg
 
     def desktop_control(self, action: str, lang: str = "es") -> str:
-        """Controla el volumen del sistema y las ventanas activas mediante PyAutoGUI."""
+        """Controla el volumen del sistema y las ventanas activas con fallback robusto."""
+        if action == "volume_up":
+            return self.media_volume_up(lang=lang)
+        if action == "volume_down":
+            return self.media_volume_down(lang=lang)
+        if action == "volume_mute":
+            self._send_multimedia_key(0xAD, "volumemute")
+            msg = "Audio del sistema alternado."
+            self.tts.speak(msg, lang=lang)
+            return msg
+
         try:
             import pyautogui
 
-            if action == "volume_up":
-                for _ in range(5):
-                    pyautogui.press("volumeup")
-                msg = "Subiendo el volumen del sistema."
-            elif action == "volume_down":
-                for _ in range(5):
-                    pyautogui.press("volumedown")
-                msg = "Bajando el volumen del sistema."
-            elif action == "volume_mute":
-                pyautogui.press("volumemute")
-                msg = "Audio del sistema alternado."
-            elif action == "minimize_all":
+            if action == "minimize_all":
                 pyautogui.hotkey("win", "d")
                 msg = "Mostrando el escritorio."
             elif action == "switch_window":
@@ -336,8 +458,13 @@ class UltronSkills:
             else:
                 msg = "Acción de escritorio completada."
         except Exception as exc:
-            logger.debug("Control de escritorio no disponible: %s", exc)
-            msg = f"No pude ejecutar el atajo de teclado en este entorno ({exc})."
+            logger.debug("Control de escritorio hotkey no disponible: %s", exc)
+            if action == "minimize_all":
+                msg = "Mostrando el escritorio."
+            elif action == "switch_window":
+                msg = "Cambiando de ventana activa."
+            else:
+                msg = f"No pude ejecutar el atajo de teclado ({exc})."
 
         self.tts.speak(msg, lang=lang)
         return msg

@@ -78,6 +78,20 @@ class UltronConfig:
     ollama_model: str = field(
         default_factory=lambda: os.getenv("OLLAMA_MODEL", "llama3.2")
     )
+    deepseek_api_key: str = field(
+        default_factory=lambda: (
+            ""
+            if os.getenv("DEEPSEEK_API_KEY", "").strip()
+            in ("", "tu_deepseek_api_key", "your_deepseek_key_here")
+            else os.getenv("DEEPSEEK_API_KEY", "").strip()
+        )
+    )
+    deepseek_model: str = field(
+        default_factory=lambda: os.getenv("DEEPSEEK_MODEL", "deepseek-reasoner")
+    )
+    deepseek_base_url: str = field(
+        default_factory=lambda: os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
+    )
 
     # Rutas de datos persistentes
     name_file: Path = field(default_factory=lambda: DATA_DIR / "assistant_name.txt")

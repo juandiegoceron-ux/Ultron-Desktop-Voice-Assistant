@@ -74,19 +74,31 @@ class UltronBrain:
             self.config, response_lang=reply_lang, input_lang=input_lang
         )
 
-        # 1. Intentar con Google Gemini si el usuario configuró su GEMINI_API_KEY real
+        # 1. Intentar con DeepSeek si está configurado como proveedor principal
+        if self.config.llm_provider == "deepseek" and self.config.deepseek_api_key:
+            reply = self._ask_deepseek(prompt, system_prompt)
+            if reply:
+                return self._clean_for_tts(reply)
+
+        # 2. Intentar con Google Gemini si el usuario configuró su GEMINI_API_KEY real
         if self.config.llm_provider == "gemini" and self.config.gemini_api_key:
             reply = self._ask_gemini(prompt, system_prompt)
             if reply:
                 return self._clean_for_tts(reply)
 
-        # 2. Intentar con Ollama local si está activo en localhost:11434
-        if self.config.llm_provider == "ollama" or not self.config.gemini_api_key:
+        # 3. Respaldo a DeepSeek si Gemini falló o no tiene clave pero hay DEEPSEEK_API_KEY
+        if self.config.deepseek_api_key:
+            reply = self._ask_deepseek(prompt, system_prompt)
+            if reply:
+                return self._clean_for_tts(reply)
+
+        # 4. Intentar con Ollama local si está activo en localhost:11434
+        if self.config.llm_provider == "ollama" or not (self.config.gemini_api_key or self.config.deepseek_api_key):
             reply = self._ask_ollama(prompt, system_prompt)
             if reply:
                 return self._clean_for_tts(reply)
 
-        # 3. Motor Cloud IA Gratuito Zero-Config con reintentos automáticos
+        # 5. Motor Cloud IA Gratuito Zero-Config con reintentos automáticos
         reply = self._ask_free_cloud_llm(prompt, system_prompt)
         if reply:
             return self._clean_for_tts(reply)
@@ -134,8 +146,19 @@ class UltronBrain:
             except Exception as exc:
                 logger.debug("Gemini generate_raw failed: %s", exc)
 
-        # 2. Ollama
-        if self.config.llm_provider == "ollama" or not self.config.gemini_api_key:
+        # 2. DeepSeek (si está configurado o como respaldo)
+        if (self.config.llm_provider == "deepseek" or not self.config.gemini_api_key) and self.config.deepseek_api_key:
+            deepseek_raw = self._ask_deepseek(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            if deepseek_raw:
+                return deepseek_raw
+
+        # 3. Ollama
+        if self.config.llm_provider == "ollama" or not (self.config.gemini_api_key or self.config.deepseek_api_key):
             try:
                 url = f"{self.config.ollama_base_url.rstrip('/')}/api/generate"
                 payload = {
@@ -196,6 +219,57 @@ class UltronBrain:
                     continue
         except Exception as exc:
             logger.warning("Error consultando Google Gemini: %s", exc)
+        return None
+
+    def _ask_deepseek(
+        self,
+        prompt: str,
+        system_prompt: str,
+        model: Optional[str] = None,
+        temperature: float = 0.6,
+        max_tokens: int = 600,
+    ) -> Optional[str]:
+        """
+        Consulta la API de DeepSeek (DeepSeek-R1 'deepseek-reasoner' o DeepSeek-V3 'deepseek-chat').
+        Aprovecha el razonamiento lógico/matemático y filtra bloques de razonamiento si se van a leer por voz.
+        """
+        if not self.config.deepseek_api_key:
+            return None
+
+        target_model = model or self.config.deepseek_model or "deepseek-reasoner"
+        headers = {
+            "Authorization": f"Bearer {self.config.deepseek_api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "UltronDesktopAssistant/5.3",
+        }
+        payload = {
+            "model": target_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            "max_tokens": max_tokens,
+        }
+        if "reasoner" not in target_model.lower():
+            payload["temperature"] = temperature
+
+        url = f"{self.config.deepseek_base_url.rstrip('/')}/chat/completions"
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=8)
+            if resp.status_code == 200:
+                data = resp.json()
+                choices = data.get("choices") or []
+                if choices:
+                    msg = choices[0].get("message") or {}
+                    content = msg.get("content") or ""
+                    if not content.strip() and msg.get("reasoning_content"):
+                        content = msg["reasoning_content"]
+                    return content.strip()
+            else:
+                logger.debug("DeepSeek API retorno status %d: %s", resp.status_code, resp.text)
+        except Exception as exc:
+            logger.debug("Fallo llamada a DeepSeek API: %s", exc)
+
         return None
 
     def _ask_ollama(self, prompt: str, system_prompt: str) -> Optional[str]:

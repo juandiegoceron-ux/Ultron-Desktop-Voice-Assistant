@@ -160,6 +160,54 @@ class TestUltronAssistant(unittest.TestCase):
         self.assertIn("Proporcional-Integral-Derivativo", resp)
         self.assertIn("Bola-Viga", resp)
 
+    def test_spotify_direct_play_and_resume(self) -> None:
+        with patch.object(self.assistant.skills, "_send_multimedia_key") as mock_key:
+            resp = self.assistant.process_command("abre spotify y reproduce música")
+            self.assertIn("Spotify", resp)
+            self.assertIn("iniciando reproducción musical", resp.lower())
+
+            resp2 = self.assistant.process_command("pon música")
+            self.assertIn("Spotify", resp2)
+
+    def test_multimedia_controls_pause_next_prev_volume(self) -> None:
+        with patch.object(self.assistant.skills, "_send_multimedia_key") as mock_key:
+            # Pausa
+            resp_pause = self.assistant.process_command("pausa la música")
+            self.assertIn("pausada", resp_pause.lower())
+
+            # Siguiente
+            resp_next = self.assistant.process_command("siguiente canción")
+            self.assertIn("siguiente canción", resp_next.lower())
+
+            # Anterior
+            resp_prev = self.assistant.process_command("canción anterior")
+            self.assertIn("anterior", resp_prev.lower())
+
+            # Volumen
+            resp_vol_up = self.assistant.process_command("sube el volumen")
+            self.assertIn("volumen", resp_vol_up.lower())
+
+    def test_deepseek_reasoner_llm_routing(self) -> None:
+        self.assistant.config.llm_provider = "deepseek"
+        self.assistant.config.deepseek_api_key = "test_sk_fake_key"
+        self.assistant.config.gemini_api_key = ""
+
+        with patch("requests.post") as mock_post:
+            mock_post.return_value.status_code = 200
+            mock_post.return_value.json.return_value = {
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": "Para sintonizar el PID de tu Bola-Viga, incrementa gradualmente Kp hasta ver oscilaciones estables.",
+                        }
+                    }
+                ]
+            }
+            reply = self.assistant.brain.ask("cómo ajusto mi pid")
+            self.assertIn("PID", reply)
+            self.assertIn("Bola-Viga", reply)
+
 
 if __name__ == "__main__":
     unittest.main()
