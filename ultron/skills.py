@@ -286,10 +286,12 @@ class UltronSkills:
         Si la consulta incluye un término específico (artista o canción), lo busca y reproduce.
         """
         clean_q = re.sub(
-            r"(?i)\b(?:abre|abrir|ábreme|abreme|en|on|spotify|y|reproduce|reproducir|pon|poner|escuchar|escucha|toca|tocar|play|search|busca|buscar|musica|música|canción|cancion|canciones|un|una|algo|de|a|al)\b",
+            r"(?i)\b(?:abre|abrir|ábreme|abreme|en|on|spotify|y|reproduce|reproducir|pon|poner|escuchar|escucha|toca|tocar|play|search|busca|buscar|musica|música|canción|cancion|canciones|temas|tema|grupo|banda|disco|álbum|album|un|una|algo|de|a|al|del|los|las|el|la)\b",
             " ",
             query or "",
-        ).strip()
+        )
+        clean_q = re.sub(r"[^\w\s\-\']", "", clean_q)
+        clean_q = re.sub(r"\s+", " ", clean_q).strip()
 
         if clean_q:
             return self.search_spotify(clean_q, lang=lang)
@@ -317,13 +319,30 @@ class UltronSkills:
         self.tts.speak(msg, lang=lang)
         return msg
 
+    @staticmethod
+    def _send_key(key_name: str) -> bool:
+        """Envía una pulsación de tecla simple al sistema si pyautogui está disponible."""
+        try:
+            import pyautogui
+
+            pyautogui.press(key_name)
+            return True
+        except Exception as exc:
+            logger.debug("pyautogui.press('%s') fallo: %s", key_name, exc)
+            return False
+
     def search_spotify(self, search_query: str, lang: str = "es") -> str:
-        """Busca un artista, canción o playlist y lo reproduce en Spotify."""
+        """Busca un artista, canción o playlist y lo reproduce en Spotify sin caracteres residuales."""
+        # 1. Limpieza de frases de activación y palabras de relleno
         clean_q = re.sub(
-            r"(?i)\b(?:abre|abrir|ábreme|abreme|en|on|spotify|y|reproduce|reproducir|pon|poner|escuchar|escucha|toca|tocar|play|search|busca|buscar|musica|música|canción|cancion|canciones|un|una|algo|de|a|al)\b",
+            r"(?i)\b(?:abre|abrir|ábreme|abreme|en|on|spotify|y|reproduce|reproducir|pon|poner|escuchar|escucha|toca|tocar|play|search|busca|buscar|musica|música|canción|cancion|canciones|temas|tema|grupo|banda|disco|álbum|album|un|una|algo|de|a|al|del|los|las|el|la)\b",
             " ",
             search_query or "",
-        ).strip()
+        )
+        # 2. Eliminar puntuación residual (puntos finales ., comas, comillas, signos de interrogación o signos más accidentales)
+        clean_q = re.sub(r"[^\w\s\-\']", "", clean_q)
+        # 3. Normalizar espacios múltiples
+        clean_q = re.sub(r"\s+", " ", clean_q).strip()
 
         if not clean_q:
             return self.play_spotify_music("", lang=lang)
@@ -331,19 +350,26 @@ class UltronSkills:
         encoded = urllib.parse.quote(clean_q)
         opened_native = False
         if sys.platform == "win32":
+            # Intentar primero con la consulta con espacios limpios (para evitar que Spotify fuerce el símbolo '+')
             try:
-                os.startfile(f"spotify:search:{encoded}")
+                os.startfile(f"spotify:search:{clean_q}")
                 opened_native = True
-            except Exception as exc:
-                logger.debug("No se pudo abrir spotify:search URI: %s", exc)
+            except Exception:
+                try:
+                    os.startfile(f"spotify:search:{encoded}")
+                    opened_native = True
+                except Exception as exc:
+                    logger.debug("No se pudo abrir spotify:search URI: %s", exc)
 
         if not opened_native:
             wb.open(f"https://open.spotify.com/search/{encoded}")
 
-        # Enviar play / enter tras 1.4s si abrió nativo
+        # Enviar Enter para enfocar el resultado principal de la búsqueda y reproducir
         def _delayed_play_search() -> None:
-            time.sleep(1.4)
+            time.sleep(1.2)
             if opened_native:
+                self._send_key("enter")
+                time.sleep(0.3)
                 self._send_multimedia_key(0xB3, "playpause")
 
         threading.Thread(target=_delayed_play_search, daemon=True).start()
