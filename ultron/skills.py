@@ -236,9 +236,45 @@ class UltronSkills:
             wb.open(web_fallback)
         return False
 
+    def search_spotify(self, search_query: str, lang: str = "es") -> str:
+        """Busca un artista, canción o playlist directamente en Spotify."""
+        clean_q = (
+            search_query.replace("en spotify", "")
+            .replace("on spotify", "")
+            .replace("spotify", "")
+            .replace("reproduce a", "")
+            .replace("reproduce", "")
+            .replace("reproducir", "")
+            .replace("pon a", "")
+            .replace("pon", "")
+            .replace("escuchar", "")
+            .replace("busca", "")
+            .replace("buscar", "")
+            .replace("play", "")
+            .strip()
+        )
+        if not clean_q:
+            return self.open_any_target("spotify", lang=lang)
+
+        encoded = urllib.parse.quote(clean_q)
+        wb.open(f"https://open.spotify.com/search/{encoded}")
+        msg = f"Buscando '{clean_q}' en Spotify, {self.config.user_name}."
+        self.tts.speak(msg, lang=lang)
+        return msg
+
     def search_youtube(self, search_query: str, lang: str = "es") -> str:
         """Busca o reproduce directamente un tema o video en YouTube."""
-        clean_q = search_query.strip()
+        clean_q = (
+            search_query.replace("en youtube", "")
+            .replace("on youtube", "")
+            .replace("youtube", "")
+            .replace("reproduce a", "")
+            .replace("reproduce", "")
+            .replace("reproducir", "")
+            .replace("pon a", "")
+            .replace("pon", "")
+            .strip()
+        )
         if not clean_q:
             wb.open("https://www.youtube.com")
             msg = "Abriendo YouTube."
@@ -401,13 +437,26 @@ class UltronSkills:
         return msg
 
     def play_music(self, query: str, lang: str = "es") -> str:
-        """Reproduce música del directorio ~/Music o abre Spotify/YouTube si no hay archivos locales."""
+        """Reproduce música del directorio ~/Music o busca en Spotify/YouTube según la orden."""
+        if "spotify" in query.lower():
+            return self.search_spotify(query, lang=lang)
+
         music_dir = Path.home() / "Music"
-        songs = [f for f in music_dir.iterdir() if f.is_file() and f.suffix.lower() in (".mp3", ".wav", ".flac", ".m4a")] if music_dir.exists() else []
+        songs = (
+            [
+                f
+                for f in music_dir.iterdir()
+                if f.is_file() and f.suffix.lower() in (".mp3", ".wav", ".flac", ".m4a")
+            ]
+            if music_dir.exists()
+            else []
+        )
 
         clean_q = (
             query.replace("reproduce música", "")
             .replace("reproducir música", "")
+            .replace("reproduce a", "")
+            .replace("reproduce", "")
             .replace("pon música", "")
             .replace("play music", "")
             .replace("joue de la musique", "")
@@ -423,7 +472,6 @@ class UltronSkills:
             self.tts.speak(msg, lang=lang)
             return msg
 
-        # Si no hay archivos MP3 locales en ~/Music, abrir Spotify o YouTube con la canción pedida
         if clean_q:
             return self.search_youtube(clean_q, lang=lang)
         return self.open_any_target("spotify", lang=lang)

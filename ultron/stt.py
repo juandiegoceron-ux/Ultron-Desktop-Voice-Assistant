@@ -114,8 +114,7 @@ class UltronSTT:
                 if not self._calibrated:
                     print("🎛️ Calibrando micrófono para el ruido ambiente (1 segundo)...")
                     recognizer.adjust_for_ambient_noise(source, duration=0.8)  # type: ignore[attr-defined]
-                    # Limitar energy_threshold entre 120 y 380 para que no ignore finales de frases largas
-                    recognizer.energy_threshold = max(120, min(recognizer.energy_threshold, 380))  # type: ignore[attr-defined]
+                    recognizer.energy_threshold = max(280, min(recognizer.energy_threshold * 1.25, 800))  # type: ignore[attr-defined]
                     self._calibrated = True
                 print(f"🎙️ {tr(target_lang, 'listening')} (Habla con naturalidad)")
                 audio = recognizer.listen(source, timeout=7, phrase_time_limit=22)  # type: ignore[attr-defined]
@@ -125,6 +124,14 @@ class UltronSTT:
             logger.warning("No se detectó micrófono activo (%s). Activando modo texto.", exc)
             self.text_mode = True
             return self.listen(lang_hint=target_lang)
+
+        # Ignorar ruidos cortos de fondo (< 0.45s) para no saturar la consola con "Procesando audio..."
+        raw_pcm = getattr(audio, "frame_data", b"")
+        sample_rate = getattr(audio, "sample_rate", 16000)
+        sample_width = getattr(audio, "sample_width", 2)
+        duration_sec = len(raw_pcm) / float(max(1, sample_rate * sample_width))
+        if duration_sec < 0.45:
+            return None
 
         print(f"⚙️ {tr(target_lang, 'recognizing')}")
 

@@ -120,6 +120,14 @@ class TestUltronAssistant(unittest.TestCase):
         resp = self.assistant.process_command("ultrón abrir nutri coach pro")
         self.assertIn("nutri", resp.lower())
 
+    def test_spotify_artist_search_routing(self) -> None:
+        resp = self.assistant.process_command("reproduce a ryan castro en spotify")
+        self.assertIn("Buscando 'ryan castro' en Spotify", resp)
+
+    def test_identity_question_instant_response(self) -> None:
+        resp = self.assistant.process_command("okay qué eres tú")
+        self.assertIn("asistente de escritorio con inteligencia artificial", resp)
+
 
 if __name__ == "__main__":
     unittest.main()

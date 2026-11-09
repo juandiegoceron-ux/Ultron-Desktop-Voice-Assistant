@@ -96,7 +96,28 @@ class UltronAssistant:
         ):
             return self.skills.acknowledge_presence(lang=out_lang)
 
-        # 1. Salida / Modo offline
+        # 1. Identidad de Ultrón ("¿qué eres tú?", "¿quién eres?", "preséntate")
+        if any(
+            w in query
+            for w in (
+                "qué eres tú",
+                "que eres tu",
+                "quién eres",
+                "quien eres",
+                "preséntate",
+                "presentate",
+                "who are you",
+                "what are you",
+            )
+        ):
+            msg = (
+                f"Soy {self.config.load_assistant_name()}, tu asistente de escritorio con inteligencia artificial, "
+                f"telemetría en tiempo real y visión multimodal, diseñado a medida para ti, {self.config.user_name}."
+            )
+            self.tts.speak(msg, lang=out_lang)
+            return msg
+
+        # 1.5 Salida / Modo offline
         if query in ("salir", "desconectar", "offline", "exit", "repos", "apágate", "apagate", "hasta luego"):
             msg = tr(out_lang, "offline", user=self.config.user_name)
             self.tts.speak(msg, lang=out_lang)
@@ -205,7 +226,13 @@ class UltronAssistant:
         if any(w in query for w in ("qué fecha", "que fecha", "qué día es hoy", "que dia es hoy", "what date", "today's date", "what day is today")):
             return self.skills.tell_date(lang=out_lang)
 
-        # 8. Búsquedas directas o compuestas en YouTube ("abre youtube y busca música", "busca en youtube...", "pon en youtube...")
+        # 8. Búsquedas o reproducción en Spotify ("reproduce a ryan castro en spotify", "pon ... en spotify", "busca en spotify...")
+        if "spotify" in query and any(
+            v in query for v in ("reproduce", "reproducir", "pon", "poner", "busca", "buscar", "escuchar", "play", "search")
+        ):
+            return self.skills.search_spotify(query, lang=out_lang)
+
+        # 8.5 Búsquedas directas o compuestas en YouTube ("abre youtube y busca música", "busca en youtube...", "pon en youtube...")
         if "youtube" in query:
             yt_compound = re.search(
                 r"(?:busca|buscar|pon|poner|reproduce|reproducir|escuchar|search|play|for)\s+(?:en\s+youtube\s+)?(.+)$",
