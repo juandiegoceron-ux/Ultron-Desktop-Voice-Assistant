@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Punto de entrada principal de Ultrón v3.0 - Asistente de Voz, Telemetría y Visión Multimodal
+Punto de entrada principal de Ultrón v4.0 ("Stark HUD") - Asistente de Voz, Telemetría y Visión Multimodal
 Personalizado para Juan Diego Cerón Duque (@juandiegoceron-ux).
 """
 
@@ -11,14 +11,31 @@ import logging
 
 from ultron.assistant import UltronAssistant
 from ultron.config import UltronConfig
+from ultron.hud_server import run_hud_server
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Ultrón v3.0: Asistente de Voz de Escritorio con IA Generativa, "
-            "Telemetría en Tiempo Real, Visión Multimodal, Whisper Offline y Wake-Word."
+            "Ultrón v4.0 (Stark HUD): Asistente de Voz de Escritorio con Interfaz Holográfica, "
+            "Voz Neural, IA Generativa, Telemetría en Tiempo Real y Visión Multimodal."
         )
+    )
+    parser.add_argument(
+        "--hud",
+        action="store_true",
+        help="Inicia la interfaz gráfica interactiva Stark HUD v4.0 en el navegador (modo recomendado).",
+    )
+    parser.add_argument(
+        "--cli",
+        action="store_true",
+        help="Fuerza el modo clásico por consola de texto/voz sin abrir la interfaz gráfica Stark HUD.",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8765,
+        help="Puerto local para el servidor Stark HUD (por defecto: 8765).",
     )
     parser.add_argument(
         "--text",
@@ -105,8 +122,15 @@ def main() -> None:
         assistant.process_command(args.command)
         return
 
+    # Stark HUD v4.0 es la experiencia interactiva predeterminada a menos que se pida --cli o --text
+    use_hud = args.hud or not (args.cli or args.text)
+    if use_hud:
+        run_hud_server(assistant=assistant, port=args.port, open_browser=True)
+        return
+
     assistant.run_forever()
 
 
 if __name__ == "__main__":
     main()
+

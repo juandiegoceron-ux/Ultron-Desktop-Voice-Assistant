@@ -7,11 +7,20 @@ cuando se alterna con el micrófono (`PyAudio`), y `pyttsx3` como motor multipla
 from __future__ import annotations
 
 import logging
+import re
 import sys
 import threading
-from typing import Dict, Optional
+import urllib.parse
+import urllib.request
+from typing import Dict, List, Optional
 
 logger = logging.getLogger("ultron.tts")
+
+NEURAL_VOICE_MAP: Dict[str, str] = {
+    "es": "es-CO-GonzaloNeural",
+    "en": "en-US-ChristopherNeural",
+    "fr": "fr-FR-HenriNeural",
+}
 
 
 class UltronTTS:
@@ -73,6 +82,114 @@ class UltronTTS:
                 except Exception as exc:
                     logger.debug("Error al sintetizar voz con pyttsx3: %s", exc)
 
+    def synthesize_neural_mp3(self, text: str, lang: str = "es") -> Optional[bytes]:
+        """
+        Sintetiza audio neural en formato MP3 en memoria para el Stark HUD v4.0.
+        - Nivel 1: Microsoft Edge Neural TTS (`edge_tts`, ej. `es-CO-GonzaloNeural`).
+        - Nivel 2: Cloud Neural TTS Zero-Install (fragmentación inteligente <= 180 caracteres).
+        Retorna `bytes` MP3 o `None` si no hay conectividad.
+        """
+        clean_text = re.sub(r"[*_`#]+", "", text or "")
+        clean_text = re.sub(r"\s+", " ", clean_text).strip()
+        if not clean_text:
+            return None
+
+        lang_key = (lang or "es").strip().lower()[:2]
+        if lang_key not in ("es", "en", "fr"):
+            lang_key = "es"
+
+        # Nivel 1: edge_tts (Neural Voice de alta fidelidad)
+        try:
+            import asyncio
+            import edge_tts  # type: ignore[import-not-found]
+
+            voice = NEURAL_VOICE_MAP.get(lang_key, "es-CO-GonzaloNeural")
+
+            async def _edge_stream() -> bytes:
+                communicate = edge_tts.Communicate(clean_text, voice)
+                audio_buf = bytearray()
+                async for chunk in communicate.stream():
+                    if chunk.get("type") == "audio" and chunk.get("data"):
+                        audio_buf.extend(chunk["data"])
+                return bytes(audio_buf)
+
+            mp3_bytes = asyncio.run(_edge_stream())
+            if mp3_bytes:
+                return mp3_bytes
+        except Exception as exc:
+            logger.debug("Fallback de edge_tts a Cloud Neural TTS: %s", exc)
+
+        # Nivel 2: Zero-Install Cloud Neural MP3 Fallback
+        try:
+            chunks = self._split_tts_chunks(clean_text, max_len=180)
+            combined = bytearray()
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                )
+            }
+            for chunk in chunks:
+                url = (
+                    "https://translate.googleapis.com/translate_tts"
+                    f"?ie=UTF-8&client=tw-ob&tl={lang_key}&q={urllib.parse.quote(chunk)}"
+                )
+                req = urllib.request.Request(url, headers=headers, method="GET")
+                with urllib.request.urlopen(req, timeout=6) as resp:
+                    data = resp.read()
+                    if data:
+                        combined.extend(data)
+            if combined:
+                return bytes(combined)
+        except Exception as exc:
+            logger.debug("Cloud Neural TTS no disponible (modo offline): %s", exc)
+
+        return None
+
+    @staticmethod
+    def _split_tts_chunks(text: str, max_len: int = 180) -> List[str]:
+        """Divide un texto largo en fragmentos <= max_len respetando oraciones y palabras."""
+        sentences = re.split(r"(?<=[.!?;:])\s+", text.strip())
+        chunks: List[str] = []
+        current = ""
+
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            if len(sentence) <= max_len:
+                candidate = f"{current} {sentence}".strip() if current else sentence
+                if len(candidate) <= max_len:
+                    current = candidate
+                else:
+                    if current:
+                        chunks.append(current)
+                    current = sentence
+            else:
+                if current:
+                    chunks.append(current)
+                    current = ""
+                words = sentence.split()
+                for word in words:
+                    if len(word) > max_len:
+                        if current:
+                            chunks.append(current)
+                            current = ""
+                        for i in range(0, len(word), max_len):
+                            chunks.append(word[i : i + max_len])
+                        continue
+                    candidate = f"{current} {word}".strip() if current else word
+                    if len(candidate) <= max_len:
+                        current = candidate
+                    else:
+                        if current:
+                            chunks.append(current)
+                        current = word
+
+        if current:
+            chunks.append(current)
+        return chunks
+
     @staticmethod
     def _speak_windows_sapi(text: str, lang: str = "es") -> bool:
         """Usa el motor COM SAPI.SpVoice nativo de Windows para evitar conflictos con PyAudio."""
@@ -102,3 +219,4 @@ class UltronTTS:
         except Exception as exc:
             logger.debug("Fallback de SAPI.SpVoice a pyttsx3: %s", exc)
             return False
+

@@ -487,25 +487,32 @@ class UltronVision:
         """Realiza una captura de pantalla utilizando el pipeline configurado."""
         return capture_screen(self.config, output_path=output_path)
 
+    def capture_screen(self, output_path: Optional[Path] = None) -> VisionCapture:
+        """Alias compatible para capturar la pantalla actual."""
+        return capture_screen(self.config, output_path=output_path)
+
     def analyze_screen(
         self,
         user_query: str = "¿Qué hay en mi pantalla?",
         mode: Optional[str] = None,
         image_path: Optional[Path] = None,
         lang: str = "es",
+        query: Optional[str] = None,
     ) -> VisionAnalysisResult:
         """
         Captura la pantalla (o lee `image_path` si se provee) y ejecuta el análisis multimodal
         utilizando el modo detectado o especificado.
         """
         start_time = time.monotonic()
+        effective_query = (query if query is not None else user_query) or "¿Qué hay en mi pantalla?"
 
         resolved_mode = (
             str(mode).lower()
             if (mode and str(mode).lower() in VALID_VISION_MODES)
-            else detect_vision_mode(user_query)
+            else detect_vision_mode(effective_query)
         )
-        prompt = build_vision_prompt(mode=resolved_mode, user_query=user_query, lang=lang)
+        prompt = build_vision_prompt(mode=resolved_mode, user_query=effective_query, lang=lang)
+        user_query = effective_query
 
         if image_path is not None and Path(image_path).exists():
             capture = _load_existing_capture(Path(image_path))
@@ -620,3 +627,6 @@ class UltronVision:
             "Para activar el análisis visual profundo con IA, configura la variable de entorno "
             "GEMINI_API_KEY o ejecuta localmente 'ollama run llava'."
         )
+
+
+VisionEngine = UltronVision

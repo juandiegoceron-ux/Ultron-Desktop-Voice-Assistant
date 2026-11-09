@@ -3,5 +3,5 @@ Ultrón - Asistente de Voz de Escritorio Inteligente, Multimodal y con Telemetr�
 Diseñado y desarrollado para Juan Diego Cerón Duque (@juandiegoceron-ux).
 """
 
-__version__ = "3.0.0"
+__version__ = "4.0.0"
 __author__ = "Juan Diego Cerón Duque"

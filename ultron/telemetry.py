@@ -124,9 +124,19 @@ class SystemHealthReport:
     uptime_minutes: int = 0
     platform_info: str = ""
 
+    @property
+    def overall_status(self) -> str:
+        """Alias compatible para el estado general del sistema."""
+        return self.status
+
     def to_dict(self) -> Dict[str, Any]:
         """Serializa el reporte completo a un diccionario compatible con JSON."""
-        return dataclasses.asdict(self)
+        data = dataclasses.asdict(self)
+        data["overall_status"] = self.status
+        if isinstance(data.get("cpu"), dict):
+            data["cpu"].setdefault("logical_cores", self.cpu.core_count_logical)
+            data["cpu"].setdefault("physical_cores", self.cpu.core_count_physical)
+        return data
 
 
 class UltronTelemetry:
@@ -900,3 +910,12 @@ class UltronTelemetry:
             + "; ".join(items)
             + "."
         )
+
+
+def collect_system_health(
+    top_n: int = 5,
+    sort_by: str = "memory",
+    user_name: str = "Juan Diego",
+) -> SystemHealthReport:
+    """Función de conveniencia para recolectar el reporte consolidado de telemetría del sistema."""
+    return UltronTelemetry(user_name=user_name).collect_report(top_n=top_n, sort_by=sort_by)

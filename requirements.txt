@@ -1,5 +1,6 @@
 # Core TTS & Audio
 pyttsx3>=2.90
+edge-tts>=6.1.12
 SpeechRecognition>=3.10.4
 
 # Pilar 3: STT Offline de baja latencia

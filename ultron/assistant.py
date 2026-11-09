@@ -289,7 +289,10 @@ class UltronAssistant:
                 .strip(" :,-")
             )
             if not note_body:
-                self.tts.speak(tr(out_lang, "note_asked"), lang=out_lang)
+                prompt_msg = tr(out_lang, "note_asked")
+                if self.tts.mute or self.stt.text_mode:
+                    return prompt_msg
+                self.tts.speak(prompt_msg, lang=out_lang)
                 follow_up = self.stt.listen(lang_hint=in_lang)
                 note_body = follow_up.text if follow_up else ""
             if note_body:

@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta
+    name="description"
+    content="ULTRÓN v4.0 — Sistema Operativo Táctico de Voz, Telemetría de Hardware en Tiempo Real y Visión Multimodal para Ing. Juan Diego Cerón Duque."
+  />
+  <meta name="theme-color" content="#0d0f12" />
+  <title>ULTRÓN // SISTEMA OPERATIVO DE VOZ E IA v4.0</title>
+
+  <!-- Google Fonts: Space Grotesk, Inter, JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- ====================================================================
+       TOP TACTICAL STATUS BAR
+       ==================================================================== -->
+  <header class="hud-topbar" role="banner">
+    <div class="topbar-brand">
+      <div class="brand-emblem" aria-hidden="true">
+        <span class="emblem-core"></span>
+      </div>
+      <div class="brand-titles">
+        <h1 class="hud-title">ULTRÓN // SISTEMA OPERATIVO DE VOZ E IA v4.0</h1>
+        <div class="hud-subtitle">
+          <span>STARK TACTICAL AUDIO-VISUAL CORE</span>
+          <span class="sep">·</span>
+          <span id="platform-info">WINDOWS / LINUX KERNEL</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="topbar-telemetry-strip">
+      <div class="status-pill" id="connection-status-pill" data-status="online">
+        <span class="status-dot" id="connection-status-dot"></span>
+        <span class="status-label" id="system-status-text">EN LÍNEA</span>
+        <span class="status-metric" id="api-latency-ms">-- ms</span>
+      </div>
+
+      <div class="status-pill operator-badge" title="Operador Principal Autorizado">
+        <span class="micro-tag">OPERADOR</span>
+        <span class="operator-name">ING. JUAN DIEGO CERÓN DUQUE</span>
+      </div>
+
+      <div class="status-pill uptime-pill">
+        <span class="micro-tag">UPTIME</span>
+        <span class="mono-val" id="uptime-readout">00h 00m</span>
+      </div>
+
+      <button
+        type="button"
+        id="tts-toggle-btn"
+        class="tactical-btn voice-toggle-btn active"
+        aria-pressed="true"
+        title="Alternar síntesis de voz neuronal (Edge-TTS / WebSpeech)"
+      >
+        <span class="btn-led" aria-hidden="true"></span>
+        <span id="tts-toggle-label">Voz Neuronal Activa</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ====================================================================
+       MAIN 3-COLUMN TACTICAL WORKSPACE
+       ==================================================================== -->
+  <main class="hud-grid" role="main">
+    <!-- ==================================================================
+         LEFT COLUMN: REAL-TIME HARDWARE TELEMETRY & PROCESS MONITOR
+         ================================================================== -->
+    <section class="hud-column col-telemetry" aria-labelledby="telemetry-heading">
+      <div class="panel-card telemetry-panel">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-index">01</span>
+            <h2 id="telemetry-heading" class="panel-title">TELEMETRÍA DE HARDWARE</h2>
+          </div>
+          <div class="panel-actions">
+            <span id="health-status-badge" class="health-badge" data-health="OPTIMAL">OPTIMAL</span>
+            <button
+              type="button"
+              id="refresh-telemetry-btn"
+              class="icon-btn"
+              title="Actualizar telemetría ahora"
+              aria-label="Actualizar telemetría ahora"
+            >
+              ↻
+            </button>
+          </div>
+        </div>
+
+        <!-- Hardware Alert Banner -->
+        <div id="telemetry-alerts" class="alert-banner hidden" role="status" aria-live="polite">
+          <span class="alert-indicator">▲</span>
+          <span id="telemetry-alerts-text">Sin alertas activas en el sistema.</span>
+        </div>
+
+        <!-- CPU & RAM Circular Instrumentation Gauges -->
+        <div class="gauges-grid">
+          <!-- CPU Gauge Card -->
+          <div class="instrument-box" id="cpu-instrument-box">
+            <div class="instrument-header">
+              <span class="micro-label">PROCESADOR (CPU)</span>
+              <span class="mono-sub" id="cpu-temp">NOMINAL</span>
+            </div>
+            <div class="gauge-row">
+              <div class="radial-gauge-wrap">
+                <svg class="radial-gauge" viewBox="0 0 100 100" aria-hidden="true">
+                  <circle class="gauge-track" cx="50" cy="50" r="40"></circle>
+                  <circle
+                    id="cpu-gauge-ring"
+                    class="gauge-fill"
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    stroke-dasharray="251.32"
+                    stroke-dashoffset="251.32"
+                  ></circle>
+                </svg>
+                <div class="gauge-center-value">
+                  <span id="cpu-percent" class="gauge-num">0.0</span>
+                  <span class="gauge-unit">%</span>
+                </div>
+              </div>
+              <div class="instrument-specs">
+                <div class="spec-line">
+                  <span class="spec-key">NÚCLEOS</span>
+                  <span class="spec-val" id="cpu-cores">--P / --L</span>
+                </div>
+                <div class="spec-line">
+                  <span class="spec-key">FRECUENCIA</span>
+                  <span class="spec-val" id="cpu-freq">---- MHz</span>
+                </div>
+                <div class="spec-line">
+                  <span class="spec-key">ESTADO</span>
+                  <span class="spec-val" id="cpu-state-label">ESTABLE</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RAM Gauge Card -->
+          <div class="instrument-box" id="ram-instrument-box">
+            <div class="instrument-header">
+              <span class="micro-label">MEMORIA FÍSICA (RAM)</span>
+              <span class="mono-sub" id="ram-swap">SWAP 0%</span>
+            </div>
+            <div class="gauge-row">
+              <div class="radial-gauge-wrap">
+                <svg class="radial-gauge" viewBox="0 0 100 100" aria-hidden="true">
+                  <circle class="gauge-track" cx="50" cy="50" r="40"></circle>
+                  <circle
+                    id="ram-gauge-ring"
+                    class="gauge-fill"
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    stroke-dasharray="251.32"
+                    stroke-dashoffset="251.32"
+                  ></circle>
+                </svg>
+                <div class="gauge-center-value">
+                  <span id="ram-percent" class="gauge-num">0.0</span>
+                  <span class="gauge-unit">%</span>
+                </div>
+              </div>
+              <div class="instrument-specs">
+                <div class="spec-line">
+                  <span class="spec-key">USO / TOTAL</span>
+                  <span class="spec-val" id="ram-used-total">0.0 / 0.0 GB</span>
+                </div>
+                <div class="spec-line">
+                  <span class="spec-key">DISPONIBLE</span>
+                  <span class="spec-val" id="ram-avail">0.0 GB</span>
+                </div>
+                <div class="spec-line">
+                  <span class="spec-key">UMBRAL</span>
+                  <span class="spec-val" id="ram-threshold-label">&lt; 85% NOMINAL</span>
+                </div>
+              </div>
+            </div>
+            <!-- Linear RAM Progress Bar (turns Amber > 75%, Crimson > 85%) -->
+            <div class="meter-bar-track" title="Nivel de saturación de memoria RAM">
+              <div id="ram-progress-bar" class="meter-bar-fill" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Secondary Telemetry: DISK & NETWORK / ENERGY -->
+        <div class="sub-telemetry-grid">
+          <!-- DISCO -->
+          <div class="sub-instrument">
+            <div class="instrument-header">
+              <span class="micro-label">ALMACENAMIENTO (DISCO)</span>
+              <span class="mono-sub" id="disk-mount">/</span>
+            </div>
+            <div class="sub-instrument-main">
+              <span class="sub-big-val" id="disk-free">-- GB LIBRES</span>
+              <span class="sub-pct-val" id="disk-percent">0.0%</span>
+            </div>
+            <div class="meter-bar-track compact">
+              <div id="disk-progress-bar" class="meter-bar-fill" style="width: 0%"></div>
+            </div>
+            <div class="sub-meta-row">
+              <span>USADO / TOTAL</span>
+              <span id="disk-used-total" class="mono-val">0.0 / 0.0 GB</span>
+            </div>
+          </div>
+
+          <!-- RED & ENERGÍA -->
+          <div class="sub-instrument">
+            <div class="instrument-header">
+              <span class="micro-label">RED &amp; ENERGÍA</span>
+              <span class="mono-sub" id="net-status">ONLINE</span>
+            </div>
+            <div class="net-energy-rows">
+              <div class="spec-line">
+                <span class="spec-key">TRÁFICO TX / RX</span>
+                <span class="spec-val" id="net-traffic">↑ 0.0 MB · ↓ 0.0 MB</span>
+              </div>
+              <div class="spec-line">
+                <span class="spec-key">ENERGÍA / BATERÍA</span>
+                <span class="spec-val" id="battery-status">AC CONECTADO</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TOP PROCESOS ACTIVOS TABLE -->
+        <div class="processes-section">
+          <div class="section-subheader">
+            <span class="micro-label">TOP 5 PROCESOS ACTIVOS (MEMORIA / CPU)</span>
+            <span class="mono-sub" id="telemetry-updated-at">SYNC --:--:--</span>
+          </div>
+          <div class="table-container">
+            <table class="tactical-table" aria-label="Top 5 procesos activos en memoria">
+              <thead>
+                <tr>
+                  <th>PROCESO</th>
+                  <th>PID</th>
+                  <th class="num-col">RAM (MB)</th>
+                  <th class="num-col">% MEM</th>
+                </tr>
+              </thead>
+              <tbody id="top-processes-body">
+                <tr>
+                  <td colspan="4" class="empty-row">Sincronizando telemetría del sistema...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================================================================
+         CENTER COLUMN: ACOUSTIC REACTOR CORE + VOICE ENGINE + CONSOLE
+         ================================================================== -->
+    <section class="hud-column col-center" aria-labelledby="reactor-heading">
+      <div class="panel-card reactor-panel">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-index">02</span>
+            <h2 id="reactor-heading" class="panel-title">NÚCLEO ACÚSTICO &amp; MOTOR DE VOZ</h2>
+          </div>
+
+          <!-- Language Selector: ES-CO Español | EN-US Inglés Tutor -->
+          <div class="segmented-control lang-control" id="lang-selector-group" role="group" aria-label="Idioma de reconocimiento de voz">
+            <button
+              type="button"
+              id="lang-es-btn"
+              class="seg-btn active"
+              data-lang="es-CO"
+              title="Hablar en Español (Colombia / Latinoamérica)"
+            >
+              ES-CO Español
+            </button>
+            <button
+              type="button"
+              id="lang-en-btn"
+              class="seg-btn"
+              data-lang="en-US"
+              title="Practicar hablando en Inglés (Ultrón te entiende en inglés y responde en español)"
+            >
+              EN-US Inglés Tutor
+            </button>
+          </div>
+        </div>
+
+        <!-- Interactive Canvas 60 FPS WebAudio Visualizer -->
+        <div class="reactor-stage" id="reactor-container">
+          <div class="reactor-hud-corner top-left">
+            <span class="micro-tag">AUDIO SPECTRUM</span>
+            <span class="mono-val" id="audio-rms-readout">0.00 dBFS</span>
+          </div>
+          <div class="reactor-hud-corner top-right">
+            <span class="micro-tag">RECOGNIZER</span>
+            <span class="mono-val" id="active-lang-badge">ES-CO</span>
+          </div>
+
+          <div
+            class="canvas-wrapper"
+            id="reactor-click-zone"
+            role="button"
+            tabindex="0"
+            aria-label="Núcleo Acústico de Ultrón. Clic para activar micrófono o interrumpir voz de Ultrón."
+            title="Clic para interrumpir a Ultrón (Barge-In) o activar escucha"
+          >
+            <canvas id="reactor-canvas" width="320" height="320"></canvas>
+          </div>
+
+          <div class="reactor-status-bar">
+            <span id="reactor-state-badge" class="reactor-state-badge" data-state="idle">
+              EN ESPERA
+            </span>
+            <button
+              type="button"
+              id="barge-in-btn"
+              class="tactical-btn crimson-btn hidden"
+              title="Detener voz de Ultrón inmediatamente (Tecla Escape)"
+            >
+              ⏹ INTERRUMPIR VOZ (ESC)
+            </button>
+          </div>
+        </div>
+
+        <!-- 3 Voice Modes Segmented Control -->
+        <div class="voice-controls-block">
+          <div class="voice-mode-header">
+            <span class="micro-label">MODO DE CAPTURA DE VOZ (SIN CORTES DE FRASE)</span>
+            <span class="mono-sub" id="debounce-timer-indicator">DEBOUNCE: 1700ms</span>
+          </div>
+
+          <div class="segmented-control voice-mode-group" id="voice-mode-group" role="group" aria-label="Modo de micrófono">
+            <button
+              type="button"
+              id="mode-handsfree-btn"
+              class="seg-btn active"
+              data-mode="handsfree"
+              title="Escucha continua inteligente: espera 1.7s de silencio antes de enviar para nunca cortarte a mitad de frase"
+            >
+              🎙️ Manos Libres (Continuo)
+            </button>
+            <button
+              type="button"
+              id="mode-ptt-btn"
+              class="seg-btn"
+              data-mode="ptt"
+              title="Mantén presionada la barra espaciadora o el botón para hablar todo el tiempo que quieras"
+            >
+              ⌨️ Push-to-Talk (Espacio)
+            </button>
+            <button
+              type="button"
+              id="mode-muted-btn"
+              class="seg-btn"
+              data-mode="muted"
+              title="Pausar micrófono y usar solo texto o botones"
+            >
+              🔇 Micrófono Pausado
+            </button>
+          </div>
+
+          <!-- Push-To-Talk Hold Button (shown prominently when PTT mode is active) -->
+          <button
+            type="button"
+            id="ptt-hold-btn"
+            class="tactical-btn ptt-hold-btn hidden"
+          >
+            🎙️ MANTÉN PRESIONADO AQUÍ O [ESPACIO] PARA HABLAR SIN LÍMITE DE TIEMPO
+          </button>
+
+          <!-- Live Transcript Preview Bar (#live-transcript) -->
+          <div class="live-transcript-bar" id="live-transcript-container">
+            <div class="transcript-prefix">
+              <span class="transcript-dot" id="transcript-activity-dot"></span>
+              <span class="micro-tag">TRANSCRIPCIÓN EN VIVO</span>
+            </div>
+            <div id="live-transcript" class="live-transcript-text" aria-live="polite">
+              Listo para escuchar tus órdenes en tiempo real...
+            </div>
+            <button
+              type="button"
+              id="flush-transcript-btn"
+              class="mini-action-btn hidden"
+              title="Enviar frase acumulada inmediatamente"
+            >
+              ENVIAR ↵
+            </button>
+          </div>
+        </div>
+
+        <!-- Conversation Console (#chat-log) + Hybrid Command Input Form (#command-form) -->
+        <div class="console-section">
+          <div class="section-subheader">
+            <span class="micro-label">CONSOLA TÁCTICA DE ÓRDENES &amp; RESPUESTAS</span>
+            <button
+              type="button"
+              id="clear-chat-btn"
+              class="text-link-btn"
+              title="Limpiar historial de consola"
+            >
+              LIMPIAR LOG
+            </button>
+          </div>
+
+          <div id="chat-log" class="chat-log" role="log" aria-live="polite">
+            <!-- Initial system greeting -->
+          </div>
+
+          <form id="command-form" class="command-form" autocomplete="off">
+            <input
+              type="text"
+              id="command-input"
+              class="command-input"
+              placeholder="Escribe cualquier orden, consulta de ingeniería o comando (ej: 'abre spotify', 'analiza mi sistema')..."
+              aria-label="Escribir comando o consulta para Ultrón"
+            />
+            <button type="submit" id="command-submit-btn" class="tactical-btn primary-btn">
+              <span>EJECUTAR</span>
+              <span aria-hidden="true">↵</span>
+            </button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================================================================
+         RIGHT COLUMN: QUICK LAUNCH DECK + MULTIMODAL DESKTOP VISION STUDIO
+         ================================================================== -->
+    <section class="hud-column col-right" aria-labelledby="quick-launch-heading">
+      <!-- Quick Launch Deck -->
+      <div class="panel-card quick-deck-panel">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-index">03</span>
+            <h2 id="quick-launch-heading" class="panel-title">LANZADOR RÁPIDO DE PROYECTOS &amp; APPS</h2>
+          </div>
+          <span class="micro-tag">1-CLICK EXEC</span>
+        </div>
+
+        <div class="quick-actions-grid">
+          <button
+            type="button"
+            id="qa-nutricoach"
+            class="quick-action-btn"
+            data-command="abre nutricoach"
+          >
+            <span class="qa-icon">🚀</span>
+            <span class="qa-info">
+              <span class="qa-title">NutriCoach Pro</span>
+              <span class="qa-cmd">abre nutricoach</span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            id="qa-inventario"
+            class="quick-action-btn"
+            data-command="abre inventario"
+          >
+            <span class="qa-icon">📦</span>
+            <span class="qa-info">
+              <span class="qa-title">Inventario Web Pro</span>
+              <span class="qa-cmd">abre inventario</span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            id="qa-spotify"
+            class="quick-action-btn"
+            data-command="abre spotify"
+          >
+            <span class="qa-icon">🎵</span>
+            <span class="qa-info">
+              <span class="qa-title">Spotify</span>
+              <span class="qa-cmd">abre spotify</span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            id="qa-vscode"
+            class="quick-action-btn"
+            data-command="abre vscode"
+          >
+            <span class="qa-icon">💻</span>
+            <span class="qa-info">
+              <span class="qa-title">VS Code</span>
+              <span class="qa-cmd">abre vscode</span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            id="qa-diagnostico"
+            class="quick-action-btn"
+            data-command="analiza mi sistema"
+          >
+            <span class="qa-icon">🩺</span>
+            <span class="qa-info">
+              <span class="qa-title">Diagnóstico PC</span>
+              <span class="qa-cmd">analiza mi sistema</span>
+            </span>
+          </button>
+
+          <div class="qa-dual-cell">
+            <button
+              type="button"
+              id="qa-vol-up"
+              class="quick-action-btn compact-qa"
+              data-command="sube el volumen"
+              title="Subir volumen del sistema"
+            >
+              <span class="qa-icon">🔊</span>
+              <span class="qa-title">Subir Vol.</span>
+            </button>
+            <button
+              type="button"
+              id="qa-vol-down"
+              class="quick-action-btn compact-qa"
+              data-command="baja el volumen"
+              title="Bajar volumen del sistema"
+            >
+              <span class="qa-icon">🔉</span>
+              <span class="qa-title">Bajar Vol.</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Multimodal Desktop Vision Studio (/api/vision) -->
+      <div class="panel-card vision-panel" aria-labelledby="vision-heading">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <span class="panel-index">04</span>
+            <h2 id="vision-heading" class="panel-title">ESTUDIO DE VISIÓN MULTIMODAL</h2>
+          </div>
+          <span class="mono-sub" id="vision-meta-badge">VLM READY</span>
+        </div>
+
+        <form id="vision-form" class="vision-controls">
+          <div class="vision-field-row">
+            <label for="vision-mode-select" class="micro-label">MODO DE INSPECCIÓN</label>
+            <select id="vision-mode-select" class="tactical-select">
+              <option value="general">GENERAL // Inspección de Escritorio</option>
+              <option value="debug">DEBUG // Depuración de Código y Consola</option>
+              <option value="ux_audit">UX AUDIT // Auditoría de Interfaz &amp; Contraste</option>
+              <option value="biomedical_pid">BIOMEDICAL PID // Señales &amp; Lazo de Control</option>
+            </select>
+          </div>
+
+          <div class="vision-field-row">
+            <label for="vision-query-input" class="micro-label">CONSULTA VISUAL ESPECÍFICA</label>
+            <input
+              type="text"
+              id="vision-query-input"
+              class="command-input compact-input"
+              value="¿Qué hay en mi pantalla y qué recomendaciones técnicas tienes?"
+              placeholder="Ej: Analiza el error en la terminal o la gráfica PID..."
+            />
+          </div>
+
+          <button type="submit" id="vision-capture-btn" class="tactical-btn vision-trigger-btn">
+            <span>👁️ Capturar y Analizar Pantalla</span>
+          </button>
+        </form>
+
+        <!-- Captured Screenshot Frame -->
+        <div class="vision-viewport" id="vision-preview-container">
+          <div id="vision-empty-state" class="vision-empty-state">
+            <span class="vision-reticle" aria-hidden="true">[ + ]</span>
+            <p>Presiona <strong>Capturar y Analizar Pantalla</strong> o di <em>"Ultrón, mira mi pantalla"</em> para inspeccionar tu escritorio en vivo.</p>
+          </div>
+          <div id="vision-image-wrapper" class="vision-image-wrapper hidden">
+            <img
+              id="vision-preview-img"
+              class="vision-preview-img"
+              src=""
+              alt="Captura de pantalla del escritorio analizada por Ultrón"
+            />
+            <div class="vision-img-overlay">
+              <span id="vision-resolution-tag" class="mono-val">1280×720</span>
+              <span class="micro-tag">CLIC PARA AMPLIAR ⤢</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vision Analysis Output -->
+        <div class="vision-output-box">
+          <div class="section-subheader">
+            <span class="micro-label">DIAGNÓSTICO VISUAL DE ULTRÓN</span>
+            <span class="mono-sub" id="vision-latency-tag">-- ms</span>
+          </div>
+          <div id="vision-analysis-output" class="vision-analysis-text">
+            Esperando captura de escritorio...
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ====================================================================
+       LIGHTBOX MODAL FOR FULL-RESOLUTION SCREENSHOT INSPECTION
+       ==================================================================== -->
+  <div id="vision-lightbox-modal" class="lightbox-modal hidden" role="dialog" aria-modal="true" aria-label="Vista ampliada de captura de pantalla">
+    <div class="lightbox-content">
+      <div class="lightbox-header">
+        <span class="mono-val" id="lightbox-caption">CAPTURA DE ESCRITORIO // ULTRÓN VISION</span>
+        <button type="button" id="lightbox-close-btn" class="tactical-btn">CERRAR [ESC]</button>
+      </div>
+      <div class="lightbox-body">
+        <img id="lightbox-img" src="" alt="Captura de pantalla ampliada" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden Neural TTS Audio Element wired to WebAudio AnalyserNode -->
+  <audio id="ultron-audio-player" preload="auto" crossorigin="anonymous"></audio>
+
+  <script src="/app.js"></script>
+</body>
+</html>
