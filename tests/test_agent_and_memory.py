@@ -200,5 +200,51 @@ class TestMemoryVoiceIntegration(unittest.TestCase):
         self.assertIn("eliminado 1 recuerdo", resp4.lower())
 
 
+class TestSecurityProtections(unittest.TestCase):
+    """Pruebas de las defensas de seguridad y prevención de fugas."""
+
+    def setUp(self) -> None:
+        self.test_dir = tempfile.mkdtemp()
+        self.config = UltronConfig()
+        self.config.notes_file = Path(self.test_dir) / "notes.json"
+        self.config.memory_file = Path(self.test_dir) / "memory.json"
+        self.config.screenshots_dir = Path(self.test_dir) / "screenshots"
+        self.assistant = UltronAssistant(self.config, text_mode=True, mute=True)
+
+    def tearDown(self) -> None:
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_skills_url_protocol_sanitization(self) -> None:
+        with patch.object(self.assistant.skills, "search_google", return_value="Buscando en Google") as mock_search:
+            res1 = self.assistant.skills.open_any_target("javascript:alert(1)")
+            self.assertEqual(res1, "Buscando en Google")
+            mock_search.assert_called_with("javascript:alert(1)", lang="es")
+
+            res2 = self.assistant.skills.open_any_target("file:///etc/passwd")
+            self.assertEqual(res2, "Buscando en Google")
+
+    def test_file_organizer_blocks_root_and_system_paths(self) -> None:
+        self.assertFalse(FileOrganizerEngine.is_safe_directory(Path("/")))
+        self.assertFalse(FileOrganizerEngine.is_safe_directory(Path("C:\\")))
+        self.assertFalse(FileOrganizerEngine.is_safe_directory(Path("/etc")))
+        self.assertFalse(FileOrganizerEngine.is_safe_directory(Path("C:\\Windows\\System32")))
+
+    def test_screenshot_pruning_policy(self) -> None:
+        from ultron.vision import _prune_old_screenshots
+
+        screenshots_dir = self.config.screenshots_dir
+        screenshots_dir.mkdir(parents=True, exist_ok=True)
+
+        for i in range(25):
+            p = screenshots_dir / f"ultron_vision_20261109_{i:04d}_000000.png"
+            p.write_bytes(b"dummy_png")
+
+        self.assertEqual(len(list(screenshots_dir.glob("ultron_vision_*.png"))), 25)
+
+        _prune_old_screenshots(screenshots_dir, max_keep=15)
+        remaining = list(screenshots_dir.glob("ultron_vision_*.png"))
+        self.assertEqual(len(remaining), 15)
+
+
 if __name__ == "__main__":
     unittest.main()

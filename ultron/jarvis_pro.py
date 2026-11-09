@@ -567,15 +567,41 @@ class FileOrganizerEngine:
 
     @staticmethod
     def is_safe_directory(target_dir: Path) -> bool:
-        """Impide tocar directorios críticos del sistema operativo."""
+        """Impide tocar directorios críticos o raíces del sistema operativo."""
         try:
-            resolved_str = str(target_dir.resolve()).lower()
+            resolved = target_dir.resolve()
+            resolved_str = str(resolved).lower()
         except Exception:
             return False
 
+        # Protección estricta: Jamás permitir la raíz de un disco (C:\, D:\, /)
+        if resolved == resolved.parent:
+            return False
+
+        raw_str = str(target_dir).strip().lower()
+        if re.match(r"^[a-z]:[\\/]*$", raw_str):
+            return False
+
+        if any(raw_str == b or raw_str.startswith(b + "\\") or raw_str.startswith(b + "/") for b in BLOCKED_SYSTEM_PATHS_WIN):
+            return False
+
         if sys.platform == "win32":
-            return not any(resolved_str.startswith(b) for b in BLOCKED_SYSTEM_PATHS_WIN)
-        return not any(resolved_str.startswith(b) for b in BLOCKED_SYSTEM_PATHS_UNIX)
+            blocked_win = set(BLOCKED_SYSTEM_PATHS_WIN)
+            for env_key in ("SystemRoot", "windir", "ProgramFiles", "ProgramFiles(x86)", "ProgramData", "CommonProgramFiles"):
+                val = os.environ.get(env_key)
+                if val:
+                    blocked_win.add(val.lower())
+            return not any(
+                resolved_str == b or resolved_str.startswith(b + "\\") or resolved_str.startswith(b + "/")
+                for b in blocked_win
+            )
+
+        blocked_unix = set(BLOCKED_SYSTEM_PATHS_UNIX)
+        blocked_unix.update(["/", "/root", "/proc", "/sys", "/dev", "/boot", "/lib", "/lib64", "/etc"])
+        return not any(
+            resolved_str == b or resolved_str.startswith(b + "/")
+            for b in blocked_unix
+        )
 
     @staticmethod
     def categorize_extension(ext: str) -> str:
@@ -603,7 +629,7 @@ class FileOrganizerEngine:
     def organize_directory(self, target_spec: str, dry_run: bool = False) -> FileOrganizationResult:
         """
         Clasifica todos los archivos sueltos de la carpeta indicada en subcarpetas por categoría.
-        Ignora archivos ocultos, archivos temporales de descarga (`.crdownload`, `.part`, `.tmp`) y carpetas.
+        Ignora archivos ocultos, archivos temporales de descarga (`.crdownload`, `.part`, `.tmp`), binarios de sistema y carpetas.
         """
         target_dir = self.resolve_target_directory(target_spec)
         if not self.is_safe_directory(target_dir):
@@ -629,11 +655,17 @@ class FileOrganizerEngine:
         summary: Dict[str, int] = {}
         moved_count = 0
 
+        # Extensiones críticas que jamás deben ser movidas por el organizador
+        ignored_extensions = (
+            ".lnk", ".url", ".ini", ".crdownload", ".part", ".tmp",
+            ".sys", ".dll", ".drv", ".ocx", ".vxd",
+        )
+
         for item in sorted(target_dir.iterdir()):
             if item.is_dir() or item.name.startswith("."):
                 continue
-            # No mover accesos directos del Escritorio (.lnk / .url) ni descargas incompletas
-            if item.suffix.lower() in (".lnk", ".url", ".ini", ".crdownload", ".part", ".tmp"):
+            # No mover accesos directos, temporales de descarga ni binarios/drivers de sistema
+            if item.suffix.lower() in ignored_extensions:
                 continue
 
             category = self.categorize_extension(item.suffix)

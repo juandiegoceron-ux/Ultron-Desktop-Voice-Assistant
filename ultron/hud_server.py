@@ -17,6 +17,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import re
 import shutil
 import subprocess
 import sys
@@ -76,15 +77,39 @@ class StarkHUDRequestHandler(BaseHTTPRequestHandler):
             return
         logger.debug("HUD HTTP: " + format, *args)
 
+    ALLOWED_ORIGIN_PATTERNS = (
+        re.compile(r"^https?://(127\.0\.0\.1|localhost)(:\d+)?$", re.IGNORECASE),
+        re.compile(r"^null$", re.IGNORECASE),
+    )
+
+    def _is_allowed_origin(self, origin: str) -> bool:
+        """Determina si un origen CORS proviene de localhost, 127.0.0.1 o el entorno local de escritorio."""
+        if not origin:
+            return True
+        return any(p.match(origin) for p in self.ALLOWED_ORIGIN_PATTERNS)
+
+    def _validate_host_header(self) -> bool:
+        """Protección estricta contra ataques de DNS Rebinding."""
+        host = self.headers.get("Host", "").strip()
+        if not host:
+            return True
+        hostname = host.split(":")[0].strip().lower()
+        return hostname in ("127.0.0.1", "localhost", "::1", "testserver")
+
     # ------------------------------------------------------------------
     # Utilidades de respuesta HTTP / JSON / CORS
     # ------------------------------------------------------------------
 
     def _send_cors_and_cache_headers(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        origin = self.headers.get("Origin", "")
+        if origin and self._is_allowed_origin(origin):
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Requested-With")
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
 
     def _send_json(self, status_code: int, payload: Dict[str, Any]) -> None:
         raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -115,11 +140,31 @@ class StarkHUDRequestHandler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------
 
     def do_OPTIONS(self) -> None:  # noqa: N802
+        if not self._validate_host_header():
+            self.send_response(403)
+            self.end_headers()
+            return
+
+        origin = self.headers.get("Origin", "")
+        if origin and not self._is_allowed_origin(origin):
+            self.send_response(403)
+            self.end_headers()
+            return
+
         self.send_response(204)
         self._send_cors_and_cache_headers()
         self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
+        if not self._validate_host_header():
+            self._send_json(403, {"ok": False, "error": "Acceso denegado: Host header no autorizado."})
+            return
+
+        origin = self.headers.get("Origin", "")
+        if origin and not self._is_allowed_origin(origin):
+            self._send_json(403, {"ok": False, "error": "Acceso denegado: Origen no autorizado."})
+            return
+
         parsed = urllib.parse.urlparse(self.path)
         route = parsed.path
 
@@ -145,6 +190,23 @@ class StarkHUDRequestHandler(BaseHTTPRequestHandler):
         self._send_json(404, {"ok": False, "error": f"Ruta no encontrada: {route}"})
 
     def do_POST(self) -> None:  # noqa: N802
+        if not self._validate_host_header():
+            self._send_json(403, {"ok": False, "error": "Acceso denegado: Host header no autorizado."})
+            return
+
+        origin = self.headers.get("Origin", "")
+        if origin and not self._is_allowed_origin(origin):
+            self._send_json(403, {"ok": False, "error": "Acceso denegado: Origen no autorizado."})
+            return
+
+        referer = self.headers.get("Referer", "")
+        if referer:
+            parsed_ref = urllib.parse.urlparse(referer)
+            ref_host = parsed_ref.hostname or ""
+            if ref_host.lower() not in ("127.0.0.1", "localhost", "::1", "testserver"):
+                self._send_json(403, {"ok": False, "error": "Acceso denegado: Referer no autorizado."})
+                return
+
         parsed = urllib.parse.urlparse(self.path)
         route = parsed.path
 

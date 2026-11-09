@@ -205,6 +205,44 @@ class TestStarkHUDServer(unittest.TestCase):
             self.assertTrue((tmp_path / "Codigo_Scripts" / "control_pid.py").exists())
             self.assertTrue((tmp_path / "Instaladores_Zip" / "setup.zip").exists())
 
+    def test_unauthorized_host_header_blocked_403(self) -> None:
+        """Protección contra DNS Rebinding: Host externo debe ser rechazado con 403."""
+        req = urllib.request.Request(
+            f"{self.base_url}/api/status",
+            headers={"Host": "evil.attacker.com:8765"},
+            method="GET",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(req, timeout=5)
+        self.assertEqual(ctx.exception.code, 403)
+
+    def test_unauthorized_origin_blocked_403(self) -> None:
+        """Protección contra Cross-Site Hijacking: Origin no local debe ser rechazado con 403."""
+        req = urllib.request.Request(
+            f"{self.base_url}/api/command",
+            data=json.dumps({"text": "hola"}).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Origin": "https://malicious-site.com"},
+            method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(req, timeout=5)
+        self.assertEqual(ctx.exception.code, 403)
+
+    def test_valid_localhost_origin_receives_matching_cors_header(self) -> None:
+        """Peticiones de localhost reciben CORS específico para su origen y nunca '*'."""
+        local_origin = f"http://127.0.0.1:{self.port}"
+        req = urllib.request.Request(
+            f"{self.base_url}/api/status",
+            headers={"Origin": local_origin},
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            self.assertEqual(resp.status, 200)
+            self.assertEqual(resp.headers.get("Access-Control-Allow-Origin"), local_origin)
+            self.assertNotEqual(resp.headers.get("Access-Control-Allow-Origin"), "*")
+            self.assertEqual(resp.headers.get("X-Content-Type-Options"), "nosniff")
+            self.assertEqual(resp.headers.get("X-Frame-Options"), "DENY")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -356,6 +356,28 @@ def _read_png_dimensions(image_bytes: bytes) -> Tuple[int, int]:
     return 1280, 720
 
 
+def _prune_old_screenshots(screenshots_dir: Path, max_keep: int = 15) -> None:
+    """
+    Elimina capturas de pantalla antiguas para proteger la privacidad del usuario
+    y evitar acumulación innecesaria en disco (Principio de Minimización de Datos).
+    """
+    try:
+        if not screenshots_dir.exists():
+            return
+        files = sorted(
+            screenshots_dir.glob("ultron_vision_*.png"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        for old_file in files[max_keep:]:
+            try:
+                old_file.unlink()
+            except OSError:
+                pass
+    except Exception as exc:
+        logger.debug("Error rotando capturas antiguas: %s", exc)
+
+
 def capture_screen(
     config: Optional[UltronConfig] = None,
     output_path: Optional[Path] = None,
@@ -371,6 +393,10 @@ def capture_screen(
     """
     cfg = config or UltronConfig()
     cfg.ensure_dirs()
+
+    # Minimización de datos y privacidad: rotar y eliminar capturas antiguas
+    if not output_path:
+        _prune_old_screenshots(cfg.screenshots_dir, max_keep=15)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     target_path = Path(output_path) if output_path else (cfg.screenshots_dir / f"ultron_vision_{timestamp}.png")

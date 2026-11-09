@@ -533,7 +533,10 @@
   async function fetchTelemetry() {
     const t0 = performance.now();
     try {
-      const resp = await fetch('/api/telemetry', { cache: 'no-store' });
+      const resp = await fetch('/api/telemetry', {
+        cache: 'no-store',
+        headers: { 'X-Requested-With': 'Ultron-HUD' },
+      });
       const latency = Math.max(1, Math.round(performance.now() - t0));
 
       if (!resp.ok) {
@@ -1407,7 +1410,10 @@
     try {
       const resp = await fetch('/api/command', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'Ultron-HUD',
+        },
         body: JSON.stringify({
           text,
           lang: langShort,
@@ -1470,7 +1476,10 @@
     try {
       const resp = await fetch('/api/vision', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'Ultron-HUD',
+        },
         body: JSON.stringify({ query, mode }),
       });
 

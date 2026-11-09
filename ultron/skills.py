@@ -216,12 +216,24 @@ class UltronSkills:
                 self.tts.speak(msg, lang=lang)
                 return msg
 
-        # 4. Si menciona un dominio (.com, .co, .org, .io, .ai) o una marca general, abrirla o buscarla
-        clean_word = target.split()[0]
+        # 4. Si menciona un dominio (.com, .co, .org, .io, .ai) o una marca general, abrirla o buscarla de forma segura
+        clean_word = re.sub(r"[^\w.:/-]", "", target.split()[0])
+        blocked_schemes = (
+            "javascript:", "file:", "data:", "vbscript:", "ms-msdt:",
+            "powershell:", "cmd:", "shell:", "ws:", "wss:", "smb:",
+        )
+        if any(clean_word.lower().startswith(b) for b in blocked_schemes):
+            return self.search_google(target, lang=lang)
+
         if "." in clean_word:
             url = clean_word if clean_word.startswith(("http://", "https://")) else f"https://{clean_word}"
         else:
             url = f"https://www.{clean_word}.com"
+
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            return self.search_google(target, lang=lang)
+
         wb.open(url)
         msg = tr(lang, "opening_site", site=target)
         self.tts.speak(msg, lang=lang)

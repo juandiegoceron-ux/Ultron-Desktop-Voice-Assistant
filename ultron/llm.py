@@ -286,7 +286,8 @@ class UltronBrain:
                         content = msg["reasoning_content"]
                     return content.strip()
             else:
-                logger.debug("DeepSeek API retorno status %d: %s", resp.status_code, resp.text)
+                safe_err = resp.text[:120].replace(self.config.deepseek_api_key, "***") if self.config.deepseek_api_key else resp.text[:120]
+                logger.debug("DeepSeek API retorno status %d: %s", resp.status_code, safe_err)
         except Exception as exc:
             logger.debug("Fallo llamada a DeepSeek API: %s", exc)
 
